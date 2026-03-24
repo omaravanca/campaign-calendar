@@ -366,13 +366,19 @@
   .tooltip-label { color: #adb5bd; font-size: 11px; min-width: 60px; }
   .tooltip-value { font-weight: 500; }
   .tooltip-products { margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 8px; }
-  .tooltip-products-title { font-size: 11px; color: #adb5bd; margin-bottom: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-  .tooltip-product-row { padding: 4px 0; font-size: 12px; }
-  .tooltip-product-row:nth-child(even) { background: rgba(255,255,255,0.05); margin: 0 -4px; padding: 4px; border-radius: 3px; }
-  .tooltip-product-name { display: flex; justify-content: space-between; gap: 12px; }
-  .tooltip-product-ean { color: #adb5bd; font-size: 11px; font-family: monospace; }
-  .tooltip-product-price { color: #adb5bd; font-size: 11px; margin-top: 1px; }
-  .tooltip-discount { color: #51cf66; font-weight: 600; }
+  .tooltip-products-title { font-size: 11px; color: #adb5bd; margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .tooltip-ptable { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .tooltip-ptable th { color: #adb5bd; font-weight: 600; text-align: left; padding: 3px 6px 3px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .tooltip-ptable th:last-child { text-align: right; }
+  .tooltip-ptable td { padding: 4px 6px 4px 0; vertical-align: top; }
+  .tooltip-ptable td:last-child { text-align: right; white-space: nowrap; }
+  .tooltip-ptable tr:nth-child(even) td { background: rgba(255,255,255,0.04); }
+  .tooltip-ptable .pname { font-weight: 500; max-width: 180px; }
+  .tooltip-ptable .pean { color: #6c757d; font-family: monospace; font-size: 10px; }
+  .tooltip-ptable .pprice { white-space: nowrap; color: #adb5bd; }
+  .tooltip-ptable .pprice-strike { text-decoration: line-through; opacity: 0.6; }
+  .tooltip-ptable .pprice-new { color: #fff; font-weight: 600; }
+  .tooltip-ptable .pdiscount { color: #51cf66; font-weight: 700; font-size: 11px; }
 
   /* Legend */
   .legend {
@@ -940,21 +946,35 @@ function Tooltip({ data, position }) {
       {data.budget != null && <div className="tooltip-row"><span className="tooltip-label">Budget</span><span className="tooltip-value">&euro;{data.budget.toLocaleString('nl-NL')}</span></div>}
       {data.products && data.products.length > 0 && (
         <div className="tooltip-products">
-          <div className="tooltip-products-title">Products</div>
-          {data.products.map((p, i) => (
-            <div key={i} className="tooltip-product-row">
-              <div className="tooltip-product-name">
-                <span>{p.name}</span>
-                {p.ean && <span className="tooltip-product-ean">{p.ean}</span>}
-              </div>
-              {(p.before || p.after) && (
-                <div className="tooltip-product-price">
-                  {fmtPrice(p.before)} {p.after ? `\u2192 ${fmtPrice(p.after)}` : ''}
-                  {p.discount != null && <span className="tooltip-discount"> (-{p.discount}%)</span>}
-                </div>
-              )}
-            </div>
-          ))}
+          <div className="tooltip-products-title">Products ({data.products.length})</div>
+          <table className="tooltip-ptable">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>EAN</th>
+                <th style={{ textAlign: 'right' }}>Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.products.map((p, i) => (
+                <tr key={i}>
+                  <td className="pname">{p.name}</td>
+                  <td className="pean">{p.ean || '—'}</td>
+                  <td className="pprice">
+                    {p.before && p.after ? (
+                      <>
+                        <span className="pprice-strike">{fmtPrice(p.before)}</span>{' '}
+                        <span className="pprice-new">{fmtPrice(p.after)}</span>{' '}
+                        {p.discount != null && <span className="pdiscount">-{p.discount}%</span>}
+                      </>
+                    ) : p.before ? (
+                      fmtPrice(p.before)
+                    ) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
       {data.notes && <div className="tooltip-row" style={{ marginTop: 6 }}><span className="tooltip-label">Notes</span><span className="tooltip-value">{data.notes}</span></div>}
