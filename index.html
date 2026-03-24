@@ -362,6 +362,31 @@
     max-width: 400px;
     line-height: 1.6;
   }
+  .tooltip.pinned {
+    pointer-events: auto;
+  }
+  .tooltip-close {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: #adb5bd;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 2px 6px;
+    line-height: 1;
+    border-radius: 3px;
+  }
+  .tooltip-close:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.1);
+  }
+  .tooltip-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 199;
+  }
   .tooltip-row { display: flex; gap: 8px; }
   .tooltip-label { color: #adb5bd; font-size: 11px; min-width: 60px; }
   .tooltip-value { font-weight: 500; }
@@ -995,14 +1020,15 @@ function SummaryBar({ campaigns }) {
   );
 }
 
-function Tooltip({ data, position }) {
+function Tooltip({ data, position, pinned, onClose }) {
   if (!data) return null;
   const fmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   const days = Math.ceil((data.endDate - data.startDate) / (1000 * 60 * 60 * 24)) + 1;
   const fmtPrice = (p) => p != null && !isNaN(p) ? `\u20AC${p.toFixed(2)}` : '';
 
   return (
-    <div className="tooltip" style={{ left: position.x + 12, top: position.y - 10 }}>
+    <div className={`tooltip ${pinned ? 'pinned' : ''}`} style={{ left: position.x + 12, top: position.y - 10 }}>
+      {pinned && <button className="tooltip-close" onClick={onClose}>&times;</button>}
       <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 14 }}>{data.name}</div>
       <div className="tooltip-row"><span className="tooltip-label">Channel</span><span className="tooltip-value">{data.channel}</span></div>
       <div className="tooltip-row"><span className="tooltip-label">Market</span><span className="tooltip-value">{data.market}</span></div>
@@ -1048,8 +1074,10 @@ function Tooltip({ data, position }) {
 }
 
 function GanttChart({ campaigns, colorMap }) {
-  const [tooltip, setTooltip] = useState(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [hoverData, setHoverData] = useState(null);
+  const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
+  const [pinned, setPinned] = useState(null);
+  const [pinnedPos, setPinnedPos] = useState({ x: 0, y: 0 });
   const timelineRef = useRef(null);
 
   // Calculate date range
@@ -1132,8 +1160,21 @@ function GanttChart({ campaigns, colorMap }) {
   const timelineWidth = totalDays * pxPerDay;
 
   const handleMouseMove = (e, campaign) => {
-    setTooltipPos({ x: e.clientX, y: e.clientY });
-    setTooltip(campaign);
+    if (!pinned) {
+      setHoverPos({ x: e.clientX, y: e.clientY });
+      setHoverData(campaign);
+    }
+  };
+
+  const handleClick = (e, campaign) => {
+    e.stopPropagation();
+    setPinnedPos({ x: e.clientX, y: e.clientY });
+    setPinned(campaign);
+    setHoverData(null);
+  };
+
+  const closePin = () => {
+    setPinned(null);
   };
 
   // Sort campaigns: active first, then by start date
@@ -1205,7 +1246,8 @@ function GanttChart({ campaigns, colorMap }) {
                       opacity: barOpacity,
                     }}
                     onMouseMove={(e) => handleMouseMove(e, campaign)}
-                    onMouseLeave={() => setTooltip(null)}
+                    onMouseLeave={() => { if (!pinned) setHoverData(null); }}
+                    onClick={(e) => handleClick(e, campaign)}
                   >
                     {widthPct > 8 ? campaign.name : ''}
                   </div>
@@ -1215,7 +1257,8 @@ function GanttChart({ campaigns, colorMap }) {
           })}
         </div>
       </div>
-      <Tooltip data={tooltip} position={tooltipPos} />
+      {!pinned && <Tooltip data={hoverData} position={hoverPos} />}
+      {pinned && <><div className="tooltip-overlay" onClick={closePin} /><Tooltip data={pinned} position={pinnedPos} pinned onClose={closePin} /></>}
     </div>
   );
 }
