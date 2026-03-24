@@ -548,8 +548,8 @@ const COLUMN_MAP = {
   enddate: 'endDate', end: 'endDate', to: 'endDate', until: 'endDate',
   status: 'status', state: 'status',
   budget: 'budget', spend: 'budget', cost: 'budget',
-  products: 'products', product: 'products',
-  eans: 'eans', ean: 'eans',
+  product: 'product', products: 'product',
+  ean: 'ean', eans: 'ean',
   pricebefore: 'priceBefore', pricesbefore: 'priceBefore', originalprice: 'priceBefore',
   priceafter: 'priceAfter', pricesafter: 'priceAfter', saleprice: 'priceAfter', promoprice: 'priceAfter',
   notes: 'notes', note: 'notes', comments: 'notes', description: 'notes',
@@ -557,52 +557,80 @@ const COLUMN_MAP = {
 
 function normalizeRows(rawRows) {
   const today = new Date();
-  return rawRows
-    .map(row => {
-      const mapped = {};
-      for (const [key, val] of Object.entries(row)) {
-        const norm = normalizeKey(key);
-        const field = COLUMN_MAP[norm];
-        if (field) mapped[field] = typeof val === 'string' ? val.trim() : val;
-      }
-      if (!mapped.name || !mapped.startDate) return null;
-      const start = parseDate(mapped.startDate);
-      const end = parseDate(mapped.endDate) || start;
-      if (!start) return null;
-      // Auto-detect status from dates
-      let status = (mapped.status || '').toLowerCase();
-      if (!status || !['planned','active','completed'].includes(status)) {
-        if (end < today && start < today) status = 'completed';
-        else if (start <= today && end >= today) status = 'active';
-        else status = 'planned';
-      }
-      const budget = mapped.budget ? parseFloat(String(mapped.budget).replace(/[^0-9.,-]/g, '').replace(',', '.')) : null;
-      // Parse comma-separated product fields
-      const splitCsv = (val) => val ? String(val).split(',').map(s => s.trim()).filter(Boolean) : [];
-      const products = splitCsv(mapped.products);
-      const eans = splitCsv(mapped.eans);
-      const pricesBefore = splitCsv(mapped.priceBefore).map(p => parseFloat(p.replace(/[^0-9.,-]/g, '').replace(',', '.')));
-      const pricesAfter = splitCsv(mapped.priceAfter).map(p => parseFloat(p.replace(/[^0-9.,-]/g, '').replace(',', '.')));
-      // Build product list with discount %
-      const productList = products.map((name, idx) => {
-        const before = pricesBefore[idx] || null;
-        const after = pricesAfter[idx] || null;
-        const discount = (before && after && before > 0) ? Math.round((before - after) / before * 100) : null;
-        return { name, ean: eans[idx] || '', before, after, discount };
+
+  // Step 1: Parse each row into a flat record
+  const parsed = rawRows.map(row => {
+    const mapped = {};
+    for (const [key, val] of Object.entries(row)) {
+      const norm = normalizeKey(key);
+      const field = COLUMN_MAP[norm];
+      if (field) mapped[field] = typeof val === 'string' ? val.trim() : val;
+    }
+    if (!mapped.name || !mapped.startDate) return null;
+    const start = parseDate(mapped.startDate);
+    const end = parseDate(mapped.endDate) || start;
+    if (!start) return null;
+
+    const budget = mapped.budget ? parseFloat(String(mapped.budget).replace(/[^0-9.,-]/g, '').replace(',', '.')) : null;
+    const productName = mapped.product ? String(mapped.product).trim() : '';
+    const ean = mapped.ean ? String(mapped.ean).trim() : '';
+    const parsePx = (v) => { if (!v) return null; const n = parseFloat(String(v).replace(/[^0-9.,-]/g, '').replace(',', '.')); return isNaN(n) ? null : n; };
+    const before = parsePx(mapped.priceBefore);
+    const after = parsePx(mapped.priceAfter);
+    const discount = (before && after && before > 0) ? Math.round((before - after) / before * 100) : null;
+
+    return {
+      name: mapped.name,
+      channel: mapped.channel || 'Other',
+      market: mapped.market || 'ALL',
+      startDate: start,
+      endDate: end,
+      status: (mapped.status || '').toLowerCase(),
+      budget: isNaN(budget) ? null : budget,
+      product: productName ? { name: productName, ean, before, after, discount } : null,
+      notes: mapped.notes || '',
+    };
+  }).filter(Boolean);
+
+  // Step 2: Group rows by campaign name — multiple rows with same name become one campaign
+  const groups = new Map();
+  for (const row of parsed) {
+    const key = row.name;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        name: row.name,
+        channel: row.channel,
+        market: row.market,
+        startDate: row.startDate,
+        endDate: row.endDate,
+        status: row.status,
+        budget: row.budget,
+        products: [],
+        notes: row.notes,
       });
-      return {
-        name: mapped.name,
-        channel: mapped.channel || 'Other',
-        market: mapped.market || 'ALL',
-        startDate: start,
-        endDate: end,
-        status,
-        budget: isNaN(budget) ? null : budget,
-        products: productList,
-        notes: mapped.notes || '',
-      };
-    })
-    .filter(Boolean);
+    }
+    const group = groups.get(key);
+    // Use earliest start and latest end across all rows
+    if (row.startDate < group.startDate) group.startDate = row.startDate;
+    if (row.endDate > group.endDate) group.endDate = row.endDate;
+    // Merge budget (take first non-null)
+    if (group.budget == null && row.budget != null) group.budget = row.budget;
+    // Merge notes (take first non-empty)
+    if (!group.notes && row.notes) group.notes = row.notes;
+    // Add product if present
+    if (row.product) group.products.push(row.product);
+  }
+
+  // Step 3: Auto-detect status and return
+  return Array.from(groups.values()).map(c => {
+    let status = c.status;
+    if (!status || !['planned','active','completed'].includes(status)) {
+      if (c.endDate < today && c.startDate < today) status = 'completed';
+      else if (c.startDate <= today && c.endDate >= today) status = 'active';
+      else status = 'planned';
+    }
+    return { ...c, status };
+  });
 }
 
 // ---- Components ----
