@@ -36,6 +36,7 @@
     --shadow-lg: 0 4px 12px rgba(0,0,0,0.1);
     --radius: 6px;
     --header-height: 56px;
+    --channel-col: 220px;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -115,6 +116,11 @@
   .btn-icon { background: none; padding: 6px 10px; color: var(--text-secondary); }
   .btn-icon:hover { color: var(--text); background: #e9ecef; }
 
+  .data-loader-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
   .file-upload {
     position: relative;
   }
@@ -404,6 +410,7 @@
     position: fixed;
     inset: 0;
     z-index: 199;
+    background: rgba(0,0,0,0.3);
   }
   .tooltip-row { display: flex; gap: 8px; }
   .tooltip-label { color: #adb5bd; font-size: 11px; min-width: 60px; }
@@ -589,8 +596,10 @@
   }
   #app-content { display: none; }
 
-  /* Mobile responsive */
+  /* Mobile responsive — tablet */
   @media (max-width: 768px) {
+    :root { --channel-col: 120px; }
+
     .header { padding: 10px 12px; }
     .header h1 { font-size: 15px; gap: 6px; }
     .header h1 span { font-size: 16px; }
@@ -599,6 +608,7 @@
       margin: 8px 10px;
       padding: 10px 12px;
       gap: 8px;
+      flex-direction: column;
     }
     .data-loader input[type="text"] {
       min-width: 0;
@@ -606,8 +616,13 @@
       font-size: 13px;
       padding: 8px 10px;
     }
+    .data-loader-buttons {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+    }
     .btn { padding: 8px 12px; font-size: 13px; }
-    .file-upload { width: 100%; }
+    .file-upload { flex: 1; }
     .file-upload .btn { width: 100%; justify-content: center; }
 
     .filter-bar {
@@ -619,7 +634,7 @@
     .summary-bar {
       margin: 0 10px;
       padding: 8px 12px;
-      gap: 12px;
+      gap: 8px 16px;
       flex-wrap: wrap;
       font-size: 12px;
       margin-bottom: 10px;
@@ -631,34 +646,85 @@
       border-radius: 4px;
     }
     .gantt-scroll {
-      max-height: calc(100vh - 240px);
+      max-height: calc(100vh - 260px);
       -webkit-overflow-scrolling: touch;
     }
     .gantt-name-header,
     .gantt-name-cell {
-      min-width: 100px;
-      max-width: 120px;
+      min-width: var(--channel-col) !important;
+      max-width: var(--channel-col) !important;
       padding: 6px 8px;
       font-size: 11px;
     }
+    .gantt-name-cell {
+      white-space: normal;
+      word-break: break-word;
+    }
     .campaign-bar {
       font-size: 9px;
-      height: 22px;
-      top: 9px;
+      height: 20px;
+      top: 10px;
       padding: 0 4px;
+      -webkit-tap-highlight-color: transparent;
     }
     .timeline-month { font-size: 10px; padding: 4px 0; }
     .timeline-week { font-size: 8px; padding: 3px 0; }
 
     .error-msg { margin: 8px 10px; font-size: 12px; }
 
+    /* Tooltip becomes bottom sheet on mobile */
     .tooltip {
-      max-width: calc(100vw - 24px);
-      font-size: 12px;
-      padding: 10px 12px;
+      position: fixed !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      top: auto !important;
+      max-width: 100% !important;
+      width: 100% !important;
+      border-radius: 16px 16px 0 0;
+      padding: 16px 16px 24px;
+      font-size: 13px;
+      max-height: 70vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      animation: slideUp 0.2s ease-out;
     }
-    .tooltip-ptable { font-size: 10px; }
-    .tooltip-ptable .pname { max-width: 120px; }
+    .tooltip::before {
+      content: '';
+      display: block;
+      width: 36px;
+      height: 4px;
+      background: rgba(255,255,255,0.25);
+      border-radius: 2px;
+      margin: 0 auto 12px;
+    }
+    .tooltip.pinned {
+      z-index: 201;
+    }
+    .tooltip-close {
+      top: 12px;
+      right: 12px;
+      font-size: 20px;
+      padding: 4px 8px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 6px;
+    }
+    .tooltip-overlay {
+      background: rgba(0,0,0,0.4);
+    }
+    .tooltip-row { gap: 6px; }
+    .tooltip-label { min-width: 55px; font-size: 11px; }
+    .tooltip-products { margin-top: 10px; padding-top: 10px; }
+    .tooltip-ptable { font-size: 11px; }
+    .tooltip-ptable .pname { max-width: none; word-break: break-word; }
+    .tooltip-ptable .pean { font-size: 9px; word-break: break-all; }
+    .tooltip-ptable th { padding: 4px 4px 4px 0; }
+    .tooltip-ptable td { padding: 6px 4px 6px 0; }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
 
     #login-gate .login-box {
       padding: 28px 20px;
@@ -666,19 +732,36 @@
       max-width: 100%;
     }
     #login-gate h2 { font-size: 18px; }
+
+    .legend { padding: 10px 12px; gap: 12px; }
+    .legend-item { font-size: 11px; }
   }
 
+  /* Mobile responsive — phone */
   @media (max-width: 480px) {
-    .data-loader { flex-direction: column; }
-    .summary-bar { gap: 8px; }
+    :root { --channel-col: 90px; }
+
+    .header h1 { font-size: 13px; }
+    .header h1 span { font-size: 14px; }
+
+    .summary-bar { gap: 6px 12px; font-size: 11px; }
+    .summary-item strong { font-size: 13px; }
+
     .gantt-name-header,
     .gantt-name-cell {
-      min-width: 80px;
-      max-width: 90px;
+      min-width: var(--channel-col) !important;
+      max-width: var(--channel-col) !important;
       font-size: 10px;
       padding: 5px 6px;
     }
-    .tooltip { max-width: calc(100vw - 16px); }
+    .campaign-bar { font-size: 0; height: 18px; top: 11px; }
+
+    .filter-bar { gap: 6px; }
+    .filter-bar label { font-size: 11px; }
+    .filter-btn { min-width: 70px; font-size: 11px; padding: 4px 6px; }
+
+    .tooltip { padding: 14px 14px 20px; max-height: 75vh; }
+    .tooltip-ptable .pean { font-size: 8px; }
   }
 </style>
 <script>
@@ -1086,21 +1169,23 @@ function DataLoader({ onData, loading, setLoading }) {
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && fetchSheet()}
         />
-        <button className="btn btn-primary" onClick={fetchSheet} disabled={loading || !url.trim()}>
-          {loading ? <><span className="spinner"></span> Loading...</> : 'Load Sheet'}
-        </button>
-        <div className="file-upload">
-          <button className="btn btn-secondary">Upload .xlsx / .csv</button>
-          <input
-            type="file"
-            ref={fileRef}
-            accept=".xlsx,.xls,.csv"
-            onChange={(e) => handleFile(e.target.files[0])}
-          />
+        <div className="data-loader-buttons">
+          <button className="btn btn-primary" onClick={fetchSheet} disabled={loading || !url.trim()} style={{ flex: 1 }}>
+            {loading ? <><span className="spinner"></span> Loading...</> : 'Load Sheet'}
+          </button>
+          <div className="file-upload">
+            <button className="btn btn-secondary">Upload .xlsx / .csv</button>
+            <input
+              type="file"
+              ref={fileRef}
+              accept=".xlsx,.xls,.csv"
+              onChange={(e) => handleFile(e.target.files[0])}
+            />
+          </div>
+          <button className="btn btn-icon" onClick={fetchSheet} disabled={loading || !url.trim()} title="Refresh data">
+            &#x21bb;
+          </button>
         </div>
-        <button className="btn btn-icon" onClick={fetchSheet} disabled={loading || !url.trim()} title="Refresh data">
-          &#x21bb;
-        </button>
       </div>
       {error && <div className="error-msg">{error}</div>}
     </div>
@@ -1222,11 +1307,15 @@ function Tooltip({ data, position, pinned, onClose }) {
   const fmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   const days = Math.ceil((data.endDate - data.startDate) / (1000 * 60 * 60 * 24)) + 1;
   const fmtPrice = (p) => p != null && !isNaN(p) ? `\u20AC${p.toFixed(2)}` : '';
+  const isMobile = window.innerWidth <= 768;
+
+  // On mobile, tooltip is a bottom sheet (CSS controls position), so don't pass left/top
+  const style = isMobile ? {} : { left: position.x + 12, top: position.y - 10 };
 
   return (
-    <div className={`tooltip ${pinned ? 'pinned' : ''}`} style={{ left: position.x + 12, top: position.y - 10 }}>
+    <div className={`tooltip ${pinned ? 'pinned' : ''}`} style={style}>
       {pinned && <button className="tooltip-close" onClick={onClose}>&times;</button>}
-      <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 14 }}>{data.name}</div>
+      <div style={{ fontWeight: 700, marginBottom: 6, fontSize: isMobile ? 16 : 14 }}>{data.name}</div>
       <div className="tooltip-row"><span className="tooltip-label">Channel</span><span className="tooltip-value">{data.channel}</span></div>
       <div className="tooltip-row"><span className="tooltip-label">Market</span><span className="tooltip-value">{data.market}</span></div>
       <div className="tooltip-row"><span className="tooltip-label">Dates</span><span className="tooltip-value">{fmt(data.startDate)} — {fmt(data.endDate)} ({days} days)</span></div>
@@ -1356,8 +1445,10 @@ function GanttChart({ campaigns, colorMap }) {
   const pxPerDay = Math.max(18, 14);
   const timelineWidth = totalDays * pxPerDay;
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
   const handleMouseMove = (e, campaign) => {
-    if (!pinned) {
+    if (!pinned && !isMobile) {
       setHoverPos({ x: e.clientX, y: e.clientY });
       setHoverData(campaign);
     }
@@ -1391,7 +1482,7 @@ function GanttChart({ campaigns, colorMap }) {
   return (
     <div className="gantt-wrapper">
       <div className="gantt-scroll">
-        <div style={{ display: 'grid', gridTemplateColumns: `220px ${timelineWidth}px` }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `var(--channel-col) ${timelineWidth}px` }}>
           {/* Header row */}
           <div className="gantt-name-header" style={{ position: 'sticky', top: 0, left: 0, zIndex: 20 }}>
             Channel
@@ -1459,7 +1550,7 @@ function GanttChart({ campaigns, colorMap }) {
           ))}
         </div>
       </div>
-      {!pinned && <Tooltip data={hoverData} position={hoverPos} />}
+      {!pinned && !isMobile && <Tooltip data={hoverData} position={hoverPos} />}
       {pinned && <><div className="tooltip-overlay" onClick={closePin} /><Tooltip data={pinned} position={pinnedPos} pinned onClose={closePin} /></>}
     </div>
   );
