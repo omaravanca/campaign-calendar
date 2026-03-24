@@ -588,6 +588,98 @@
     min-height: 20px;
   }
   #app-content { display: none; }
+
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    .header { padding: 10px 12px; }
+    .header h1 { font-size: 15px; gap: 6px; }
+    .header h1 span { font-size: 16px; }
+
+    .data-loader {
+      margin: 8px 10px;
+      padding: 10px 12px;
+      gap: 8px;
+    }
+    .data-loader input[type="text"] {
+      min-width: 0;
+      width: 100%;
+      font-size: 13px;
+      padding: 8px 10px;
+    }
+    .btn { padding: 8px 12px; font-size: 13px; }
+    .file-upload { width: 100%; }
+    .file-upload .btn { width: 100%; justify-content: center; }
+
+    .filter-bar {
+      padding: 8px 10px;
+      gap: 8px;
+    }
+    .filter-btn { min-width: 80px; font-size: 12px; padding: 5px 8px; }
+
+    .summary-bar {
+      margin: 0 10px;
+      padding: 8px 12px;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+    .summary-item strong { font-size: 14px; }
+
+    .gantt-wrapper {
+      margin: 0 10px 16px;
+      border-radius: 4px;
+    }
+    .gantt-scroll {
+      max-height: calc(100vh - 240px);
+      -webkit-overflow-scrolling: touch;
+    }
+    .gantt-name-header,
+    .gantt-name-cell {
+      min-width: 100px;
+      max-width: 120px;
+      padding: 6px 8px;
+      font-size: 11px;
+    }
+    .campaign-bar {
+      font-size: 9px;
+      height: 22px;
+      top: 9px;
+      padding: 0 4px;
+    }
+    .timeline-month { font-size: 10px; padding: 4px 0; }
+    .timeline-week { font-size: 8px; padding: 3px 0; }
+
+    .error-msg { margin: 8px 10px; font-size: 12px; }
+
+    .tooltip {
+      max-width: calc(100vw - 24px);
+      font-size: 12px;
+      padding: 10px 12px;
+    }
+    .tooltip-ptable { font-size: 10px; }
+    .tooltip-ptable .pname { max-width: 120px; }
+
+    #login-gate .login-box {
+      padding: 28px 20px;
+      margin: 0 16px;
+      max-width: 100%;
+    }
+    #login-gate h2 { font-size: 18px; }
+  }
+
+  @media (max-width: 480px) {
+    .data-loader { flex-direction: column; }
+    .summary-bar { gap: 8px; }
+    .gantt-name-header,
+    .gantt-name-cell {
+      min-width: 80px;
+      max-width: 90px;
+      font-size: 10px;
+      padding: 5px 6px;
+    }
+    .tooltip { max-width: calc(100vw - 16px); }
+  }
 </style>
 <script>
   /* If already authenticated, swap visibility immediately before paint */
