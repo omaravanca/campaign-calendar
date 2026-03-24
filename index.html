@@ -1271,15 +1271,17 @@ function GanttChart({ campaigns, colorMap }) {
     setPinned(null);
   };
 
-  // Sort campaigns: active first, then by start date
-  const sorted = useMemo(() => {
-    return [...campaigns].sort((a, b) => {
-      const statusOrder = { active: 0, planned: 1, completed: 2 };
-      const sa = statusOrder[a.status] ?? 1;
-      const sb = statusOrder[b.status] ?? 1;
-      if (sa !== sb) return sa - sb;
-      return a.startDate - b.startDate;
+  // Group campaigns by channel
+  const channelGroups = useMemo(() => {
+    const groups = new Map();
+    campaigns.forEach(c => {
+      const ch = c.channel;
+      if (!groups.has(ch)) groups.set(ch, []);
+      groups.get(ch).push(c);
     });
+    // Sort campaigns within each channel by start date
+    groups.forEach(list => list.sort((a, b) => a.startDate - b.startDate));
+    return Array.from(groups.entries());
   }, [campaigns]);
 
 
@@ -1289,7 +1291,7 @@ function GanttChart({ campaigns, colorMap }) {
         <div style={{ display: 'grid', gridTemplateColumns: `220px ${timelineWidth}px` }}>
           {/* Header row */}
           <div className="gantt-name-header" style={{ position: 'sticky', top: 0, left: 0, zIndex: 20 }}>
-            Campaign
+            Channel
           </div>
           <div className="gantt-timeline-header" style={{ width: timelineWidth }}>
             <div className="timeline-months">
@@ -1308,47 +1310,49 @@ function GanttChart({ campaigns, colorMap }) {
             </div>
           </div>
 
-          {/* Campaign rows */}
-          {sorted.map((campaign, i) => {
-            const startOffset = (campaign.startDate - minDate) / (1000*60*60*24);
-            const duration = Math.max(1, Math.ceil((campaign.endDate - campaign.startDate) / (1000*60*60*24)) + 1);
-            const leftPct = (startOffset / totalDays) * 100;
-            const widthPct = (duration / totalDays) * 100;
-            const color = colorMap[campaign.name];
-            const barOpacity = campaign.status === 'completed' ? 0.5 : campaign.status === 'planned' ? 0.75 : 1;
-
-            return (
-              <React.Fragment key={i}>
-                <div className="gantt-name-cell" title={campaign.name}>
-                  <span className="channel-dot" style={{ background: color }}></span>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{campaign.name}</span>
-                </div>
-                <div className="gantt-timeline-cell" style={{ position: 'relative' }}>
-                  {/* Week stripes */}
-                  {weeks.map((w, wi) => (
-                    <div key={wi} className="week-stripe" style={{ left: `${w.pct}%`, width: `${w.widthPct}%` }} />
-                  ))}
-                  {/* Today marker */}
-                  {todayPct != null && <div className="today-marker" style={{ left: `${todayPct}%` }} />}
-                  {/* Campaign bar */}
-                  <div
-                    className="campaign-bar"
-                    style={{
-                      left: `${leftPct}%`,
-                      width: `${widthPct}%`,
-                      background: color,
-                      opacity: barOpacity,
-                    }}
-                    onMouseMove={(e) => handleMouseMove(e, campaign)}
-                    onMouseLeave={() => { if (!pinned) setHoverData(null); }}
-                    onClick={(e) => handleClick(e, campaign)}
-                  >
-                    {widthPct > 8 ? campaign.name : ''}
-                  </div>
-                </div>
-              </React.Fragment>
-            );
-          })}
+          {/* Channel rows — one row per channel, multiple campaign bars */}
+          {channelGroups.map(([channel, channelCampaigns], i) => (
+            <React.Fragment key={channel}>
+              <div className="gantt-name-cell" title={channel}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>{channel}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 'auto' }}>{channelCampaigns.length}</span>
+              </div>
+              <div className="gantt-timeline-cell" style={{ position: 'relative' }}>
+                {/* Week stripes */}
+                {weeks.map((w, wi) => (
+                  <div key={wi} className="week-stripe" style={{ left: `${w.pct}%`, width: `${w.widthPct}%` }} />
+                ))}
+                {/* Today marker */}
+                {todayPct != null && <div className="today-marker" style={{ left: `${todayPct}%` }} />}
+                {/* All campaign bars for this channel */}
+                {channelCampaigns.map((campaign, ci) => {
+                  const startOffset = (campaign.startDate - minDate) / (1000*60*60*24);
+                  const duration = Math.max(1, Math.ceil((campaign.endDate - campaign.startDate) / (1000*60*60*24)) + 1);
+                  const leftPct = (startOffset / totalDays) * 100;
+                  const widthPct = (duration / totalDays) * 100;
+                  const color = colorMap[campaign.name];
+                  const barOpacity = campaign.status === 'completed' ? 0.5 : campaign.status === 'planned' ? 0.75 : 1;
+                  return (
+                    <div
+                      key={ci}
+                      className="campaign-bar"
+                      style={{
+                        left: `${leftPct}%`,
+                        width: `${widthPct}%`,
+                        background: color,
+                        opacity: barOpacity,
+                      }}
+                      onMouseMove={(e) => handleMouseMove(e, campaign)}
+                      onMouseLeave={() => { if (!pinned) setHoverData(null); }}
+                      onClick={(e) => handleClick(e, campaign)}
+                    >
+                      {widthPct > 8 ? campaign.name : ''}
+                    </div>
+                  );
+                })}
+              </div>
+            </React.Fragment>
+          ))}
         </div>
       </div>
       {!pinned && <Tooltip data={hoverData} position={hoverPos} />}
