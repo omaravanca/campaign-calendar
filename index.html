@@ -493,16 +493,47 @@ const CAMPAIGN_PALETTE = [
   '#9b5de5', '#00f5d4', '#fee440', '#f15bb5', '#00bbf9',
 ];
 
-// Assign unique colors to campaigns — no two campaigns share a color
+// Deterministic hash from campaign name — always returns same number for same name
+function hashName(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) {
+    h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+// Assign unique colors to campaigns — deterministic by name, no overlaps
 function buildCampaignColorMap(campaigns) {
+  const names = [...new Set(campaigns.map(c => c.name))];
   const map = {};
-  let idx = 0;
-  campaigns.forEach(c => {
-    if (!map[c.name]) {
-      map[c.name] = CAMPAIGN_PALETTE[idx % CAMPAIGN_PALETTE.length];
-      idx++;
+  const used = new Set();
+
+  // First pass: assign each campaign its hashed color if available
+  names.forEach(name => {
+    const preferred = hashName(name) % CAMPAIGN_PALETTE.length;
+    if (!used.has(preferred)) {
+      map[name] = CAMPAIGN_PALETTE[preferred];
+      used.add(preferred);
     }
   });
+
+  // Second pass: resolve collisions — assign next unused color
+  names.forEach(name => {
+    if (!map[name]) {
+      for (let i = 0; i < CAMPAIGN_PALETTE.length; i++) {
+        if (!used.has(i)) {
+          map[name] = CAMPAIGN_PALETTE[i];
+          used.add(i);
+          break;
+        }
+      }
+      // If all 20 used, cycle with hash offset
+      if (!map[name]) {
+        map[name] = CAMPAIGN_PALETTE[hashName(name) % CAMPAIGN_PALETTE.length];
+      }
+    }
+  });
+
   return map;
 }
 
