@@ -6,10 +6,6 @@
 <title>Campaign Calendar — Avanca / Hombli</title>
 
 <!-- Password gate -->
-<style>
-  #app-content.locked { display: none; }
-  #login-gate.unlocked { display: none; }
-</style>
 <script>
   var CC_HASH = 'acee6f232d65d5dd76455ed96d94eea1c46f0ddb6f7e4f8e64d728797b5a3f3c';
   var CC_AUTHED = sessionStorage.getItem('cc_auth') === CC_HASH;
@@ -583,7 +579,7 @@
 </style>
 </head>
 <body>
-<script>document.write('<div id="login-gate" class="' + (CC_AUTHED ? 'unlocked' : '') + '">')</script>
+<div id="login-gate">
   <div class="login-box">
     <h2>Campaign Calendar</h2>
     <p>Enter password to access the dashboard</p>
@@ -594,7 +590,7 @@
     <div id="login-error"></div>
   </div>
 </div>
-<script>document.write('<div id="app-content" class="' + (CC_AUTHED ? '' : 'locked') + '">')</script>
+<div id="app-content">
 <div id="root"></div>
 
 <script type="text/babel">
@@ -1424,31 +1420,42 @@ root.render(<App />);
 </script>
 </div>
 <script>
-if (!CC_AUTHED) {
-  (function() {
+(function() {
+  var gate = document.getElementById('login-gate');
+  var app = document.getElementById('app-content');
+
+  if (CC_AUTHED) {
+    gate.style.display = 'none';
+    app.style.display = 'block';
+  } else {
+    gate.style.display = 'flex';
+    app.style.display = 'none';
+
     async function sha256(str) {
       var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
       return Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
     }
+
     var form = document.getElementById('login-form');
     var input = document.getElementById('login-password');
     var error = document.getElementById('login-error');
     input.focus();
+
     form.addEventListener('submit', async function(e) {
       e.preventDefault();
       var hash = await sha256(input.value);
       if (hash === CC_HASH) {
         sessionStorage.setItem('cc_auth', CC_HASH);
-        document.getElementById('login-gate').classList.add('unlocked');
-        document.getElementById('app-content').classList.remove('locked');
+        gate.style.display = 'none';
+        app.style.display = 'block';
       } else {
         error.textContent = 'Incorrect password';
         input.value = '';
         input.focus();
       }
     });
-  })();
-}
+  }
+})();
 </script>
 </body>
 </html>
