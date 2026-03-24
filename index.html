@@ -573,7 +573,7 @@ function normalizeRows(rawRows) {
 
     const budget = mapped.budget ? parseFloat(String(mapped.budget).replace(/[^0-9.,-]/g, '').replace(',', '.')) : null;
     const productName = mapped.product ? String(mapped.product).trim() : '';
-    const ean = mapped.ean ? String(mapped.ean).trim() : '';
+    const eans = mapped.ean ? String(mapped.ean).split(',').map(s => s.trim()).filter(Boolean) : [];
     const parsePx = (v) => { if (!v) return null; const n = parseFloat(String(v).replace(/[^0-9.,-]/g, '').replace(',', '.')); return isNaN(n) ? null : n; };
     const before = parsePx(mapped.priceBefore);
     const after = parsePx(mapped.priceAfter);
@@ -587,7 +587,7 @@ function normalizeRows(rawRows) {
       endDate: end,
       status: (mapped.status || '').toLowerCase(),
       budget: isNaN(budget) ? null : budget,
-      product: productName ? { name: productName, ean, before, after, discount } : null,
+      product: productName ? { name: productName, eans, before, after, discount } : null,
       notes: mapped.notes || '',
     };
   }).filter(Boolean);
@@ -979,7 +979,7 @@ function Tooltip({ data, position }) {
             <thead>
               <tr>
                 <th>Product</th>
-                <th>EAN</th>
+                <th>EANs</th>
                 <th style={{ textAlign: 'right' }}>Price</th>
               </tr>
             </thead>
@@ -987,7 +987,7 @@ function Tooltip({ data, position }) {
               {data.products.map((p, i) => (
                 <tr key={i}>
                   <td className="pname">{p.name}</td>
-                  <td className="pean">{p.ean || '—'}</td>
+                  <td className="pean">{p.eans && p.eans.length > 0 ? p.eans.map((e, ei) => <div key={ei}>{e}</div>) : '—'}</td>
                   <td className="pprice">
                     {p.before && p.after ? (
                       <>
