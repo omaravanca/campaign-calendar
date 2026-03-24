@@ -340,19 +340,33 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 2px;
-    background: var(--danger);
-    z-index: 4;
+    width: 1px;
+    border-left: 1px dashed var(--danger);
+    background: none;
+    z-index: 2;
     pointer-events: none;
   }
-  .today-marker::before {
+  .today-marker-header {
+    position: absolute;
+    bottom: 0;
+    width: 1px;
+    border-left: 1px dashed var(--danger);
+    background: none;
+    z-index: 16;
+    pointer-events: none;
+    top: 0;
+  }
+  .today-marker-header::after {
     content: 'Today';
     position: absolute;
-    top: -18px;
-    left: -16px;
-    font-size: 10px;
+    bottom: 2px;
+    left: 4px;
+    font-size: 9px;
     color: var(--danger);
-    font-weight: 600;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
   }
 
   /* Tooltip */
@@ -1293,7 +1307,7 @@ function GanttChart({ campaigns, colorMap }) {
           <div className="gantt-name-header" style={{ position: 'sticky', top: 0, left: 0, zIndex: 20 }}>
             Channel
           </div>
-          <div className="gantt-timeline-header" style={{ width: timelineWidth }}>
+          <div className="gantt-timeline-header" style={{ width: timelineWidth, position: 'relative' }}>
             <div className="timeline-months">
               {months.map((m, i) => (
                 <div key={i} className="timeline-month" style={{ width: `${m.widthPct}%`, marginLeft: i === 0 ? `${m.startPct}%` : 0 }}>
@@ -1308,6 +1322,7 @@ function GanttChart({ campaigns, colorMap }) {
                 </div>
               ))}
             </div>
+            {todayPct != null && <div className="today-marker-header" style={{ left: `${todayPct}%` }} />}
           </div>
 
           {/* Channel rows — one row per channel, multiple campaign bars */}
