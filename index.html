@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campaign Calendar — Avanca / Hombli</title>
+
+<!-- React 18 -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<!-- Babel standalone for JSX -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- SheetJS for .xlsx/.csv file parsing -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<!-- Papa Parse for Google Sheets CSV -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<style>
+  :root {
+    --bg: #f8f9fa;
+    --surface: #ffffff;
+    --border: #dee2e6;
+    --text: #212529;
+    --text-secondary: #6c757d;
+    --accent: #4361ee;
+    --accent-hover: #3a56d4;
+    --danger: #e63946;
+    --row-hover: #f1f3f5;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-lg: 0 4px 12px rgba(0,0,0,0.1);
+    --radius: 6px;
+    --header-height: 56px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  /* Header */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--shadow);
+  }
+  .header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .header h1 span { font-size: 20px; }
+
+  /* Data Loader */
+  .data-loader {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 24px;
+    margin: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    box-shadow: var(--shadow);
+  }
+  .data-loader input[type="text"] {
+    flex: 1;
+    min-width: 280px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .data-loader input[type="text"]:focus {
+    border-color: var(--accent);
+  }
+  .btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, opacity 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-secondary { background: #e9ecef; color: var(--text); }
+  .btn-secondary:hover:not(:disabled) { background: #dee2e6; }
+  .btn-icon { background: none; padding: 6px 10px; color: var(--text-secondary); }
+  .btn-icon:hover { color: var(--text); background: #e9ecef; }
+
+  .file-upload {
+    position: relative;
+  }
+  .file-upload input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  /* Filter Bar */
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 24px;
+    flex-wrap: wrap;
+  }
+  .filter-bar label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .filter-group {
+    position: relative;
+  }
+  .filter-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 100px;
+    transition: border-color 0.2s;
+  }
+  .filter-btn:hover { border-color: var(--accent); }
+  .filter-btn.active { border-color: var(--accent); background: #eef1ff; }
+  .filter-btn .arrow { font-size: 10px; margin-left: auto; }
+  .filter-btn .count {
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 4px;
+  }
+  .filter-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    z-index: 50;
+    min-width: 160px;
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 4px 0;
+  }
+  .filter-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .filter-option:hover { background: var(--row-hover); }
+  .filter-option input[type="checkbox"] { accent-color: var(--accent); }
+
+  /* Summary Bar */
+  .summary-bar {
+    display: flex;
+    gap: 24px;
+    padding: 10px 24px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    margin: 0 24px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+  }
+  .summary-item { display: flex; align-items: center; gap: 6px; }
+  .summary-item strong { color: var(--text); font-size: 16px; }
+
+  /* Gantt Container */
+  .gantt-wrapper {
+    margin: 0 24px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .gantt-scroll {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 280px);
+  }
+  .gantt-table {
+    display: grid;
+    min-width: 100%;
+    position: relative;
+  }
+  .gantt-header-row {
+    display: contents;
+  }
+  .gantt-name-header,
+  .gantt-name-cell {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: var(--surface);
+    min-width: 200px;
+    max-width: 240px;
+    padding: 8px 12px;
+    border-right: 2px solid var(--border);
+    font-size: 13px;
+  }
+  .gantt-name-header {
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    z-index: 20;
+    position: sticky;
+    top: 0;
+  }
+  .gantt-name-cell {
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .gantt-name-cell:hover { background: var(--row-hover); }
+  .channel-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .gantt-timeline-header {
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    background: var(--surface);
+  }
+  .gantt-timeline-cell {
+    position: relative;
+    border-bottom: 1px solid #f0f0f0;
+    height: 40px;
+  }
+  .gantt-timeline-cell:hover { background: var(--row-hover); }
+
+  /* Month/Week labels */
+  .timeline-months {
+    display: flex;
+    border-bottom: 1px solid #eee;
+  }
+  .timeline-month {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 0;
+    text-align: center;
+    border-right: 1px solid #eee;
+    color: var(--text);
+  }
+  .timeline-weeks {
+    display: flex;
+  }
+  .timeline-week {
+    font-size: 10px;
+    color: var(--text-secondary);
+    padding: 4px 0;
+    text-align: center;
+    border-right: 1px solid #f0f0f0;
+  }
+
+  /* Campaign bar */
+  .campaign-bar {
+    position: absolute;
+    height: 24px;
+    top: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    min-width: 6px;
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    font-size: 11px;
+    color: #fff;
+    font-weight: 500;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .campaign-bar:hover {
+    opacity: 0.85;
+    transform: scaleY(1.15);
+    z-index: 5;
+  }
+
+  /* Today marker */
+  .today-marker {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--danger);
+    z-index: 4;
+    pointer-events: none;
+  }
+  .today-marker::before {
+    content: 'Today';
+    position: absolute;
+    top: -18px;
+    left: -16px;
+    font-size: 10px;
+    color: var(--danger);
+    font-weight: 600;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed;
+    background: #1a1a2e;
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    z-index: 200;
+    pointer-events: none;
+    box-shadow: var(--shadow-lg);
+    max-width: 300px;
+    line-height: 1.6;
+  }
+  .tooltip-row { display: flex; gap: 8px; }
+  .tooltip-label { color: #adb5bd; font-size: 11px; min-width: 60px; }
+  .tooltip-value { font-weight: 500; }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 20px;
+    padding: 12px 24px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--text-secondary);
+  }
+  .empty-state h2 { font-size: 20px; color: var(--text); margin-bottom: 8px; }
+  .empty-state p { max-width: 500px; margin: 0 auto 16px; font-size: 14px; }
+  .empty-state .steps {
+    text-align: left;
+    max-width: 460px;
+    margin: 24px auto 0;
+    background: var(--bg);
+    padding: 20px 24px;
+    border-radius: var(--radius);
+    font-size: 13px;
+  }
+  .empty-state .steps li { margin-bottom: 8px; }
+  .empty-state .steps code {
+    background: #e9ecef;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+  }
+
+  /* Loading spinner */
+  .spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #e9ecef;
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Status badges */
+  .status-badge {
+    font-size: 11px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+  .status-planned { background: #e9ecef; color: #495057; }
+  .status-active { background: #d3f9d8; color: #2b8a3e; }
+  .status-completed { background: #e7f5ff; color: #1971c2; }
+
+  /* Error */
+  .error-msg {
+    background: #fff5f5;
+    color: var(--danger);
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    margin: 8px 24px;
+    font-size: 13px;
+    border: 1px solid #ffc9c9;
+  }
+
+  /* Dropzone highlight */
+  .dropzone-active {
+    outline: 2px dashed var(--accent);
+    outline-offset: -4px;
+    background: #eef1ff !important;
+  }
+
+  /* Week column stripe */
+  .week-stripe {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-right: 1px solid #f5f5f5;
+  }
+  .week-stripe:nth-child(even) {
+    background: rgba(0,0,0,0.008);
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+// Channel colors
+const CHANNEL_COLORS = {
+  meta:      '#1877F2',
+  facebook:  '#1877F2',
+  instagram: '#E4405F',
+  bol:       '#0000FF',
+  'bol.com': '#0000FF',
+  shopify:   '#96BF48',
+  mailchimp: '#FFE01B',
+  email:     '#FF6B35',
+  google:    '#34A853',
+  tiktok:    '#010101',
+  linkedin:  '#0A66C2',
+  other:     '#6c757d',
+};
+
+function getChannelColor(channel) {
+  if (!channel) return CHANNEL_COLORS.other;
+  const key = channel.toLowerCase().trim();
+  return CHANNEL_COLORS[key] || CHANNEL_COLORS.other;
+}
+
+// Parse dates — handles ISO (2026-03-01) and EU (01/03/2026, 01-03-2026)
+function parseDate(str) {
+  if (!str) return null;
+  str = String(str).trim();
+  // Excel serial number
+  if (/^\d{5}$/.test(str)) {
+    const d = new Date((parseInt(str) - 25569) * 86400 * 1000);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  // ISO: 2026-03-01
+  if (/^\d{4}-\d{1,2}-\d{1,2}/.test(str)) {
+    const d = new Date(str.split('T')[0] + 'T00:00:00');
+    return isNaN(d.getTime()) ? null : d;
+  }
+  // EU: 01/03/2026 or 01-03-2026
+  const eu = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (eu) {
+    const d = new Date(`${eu[3]}-${eu[2].padStart(2,'0')}-${eu[1].padStart(2,'0')}T00:00:00`);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  // Last resort
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// Normalize column names
+function normalizeKey(key) {
+  return key.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+const COLUMN_MAP = {
+  campaignname: 'name', campaign: 'name', name: 'name',
+  channel: 'channel', platform: 'channel',
+  market: 'market', country: 'market', region: 'market',
+  startdate: 'startDate', start: 'startDate', from: 'startDate', begin: 'startDate',
+  enddate: 'endDate', end: 'endDate', to: 'endDate', until: 'endDate',
+  status: 'status', state: 'status',
+  budget: 'budget', spend: 'budget', cost: 'budget',
+  notes: 'notes', note: 'notes', comments: 'notes', description: 'notes',
+};
+
+function normalizeRows(rawRows) {
+  const today = new Date();
+  return rawRows
+    .map(row => {
+      const mapped = {};
+      for (const [key, val] of Object.entries(row)) {
+        const norm = normalizeKey(key);
+        const field = COLUMN_MAP[norm];
+        if (field) mapped[field] = typeof val === 'string' ? val.trim() : val;
+      }
+      if (!mapped.name || !mapped.startDate) return null;
+      const start = parseDate(mapped.startDate);
+      const end = parseDate(mapped.endDate) || start;
+      if (!start) return null;
+      // Auto-detect status from dates
+      let status = (mapped.status || '').toLowerCase();
+      if (!status || !['planned','active','completed'].includes(status)) {
+        if (end < today && start < today) status = 'completed';
+        else if (start <= today && end >= today) status = 'active';
+        else status = 'planned';
+      }
+      const budget = mapped.budget ? parseFloat(String(mapped.budget).replace(/[^0-9.,-]/g, '').replace(',', '.')) : null;
+      return {
+        name: mapped.name,
+        channel: mapped.channel || 'Other',
+        market: mapped.market || 'ALL',
+        startDate: start,
+        endDate: end,
+        status,
+        budget: isNaN(budget) ? null : budget,
+        notes: mapped.notes || '',
+      };
+    })
+    .filter(Boolean);
+}
+
+// ---- Components ----
+
+function DataLoader({ onData, loading, setLoading }) {
+  const [url, setUrl] = useState(() => localStorage.getItem('campaignCalendarUrl') || '');
+  const [error, setError] = useState(null);
+  const fileRef = useRef(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const parseCsvText = useCallback((text) => {
+    const results = Papa.parse(text, { header: true, skipEmptyLines: true });
+    if (results.errors.length && !results.data.length) {
+      setError('Failed to parse CSV. Is the sheet published to web as CSV?');
+      return;
+    }
+    const campaigns = normalizeRows(results.data);
+    if (!campaigns.length) {
+      setError('No valid campaigns found. Check column names (Campaign Name, Channel, Start Date, End Date).');
+      return;
+    }
+    onData(campaigns);
+  }, [onData]);
+
+  // Extract spreadsheet ID from any Google Sheets URL format
+  const extractSheetId = useCallback((sheetUrl) => {
+    // Format: /spreadsheets/d/e/2PACX-.../pub?...
+    const pubMatch = sheetUrl.match(/\/spreadsheets\/d\/e\/(2PACX[^/]+)/);
+    if (pubMatch) return { type: 'pub', id: pubMatch[1] };
+    // Format: /spreadsheets/d/SHEET_ID/...
+    const editMatch = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    if (editMatch) return { type: 'edit', id: editMatch[1] };
+    return null;
+  }, []);
+
+  // JSONP fetch — bypasses CORS entirely by using <script> tag injection
+  const fetchViaJsonp = useCallback((sheetUrl) => {
+    return new Promise((resolve, reject) => {
+      const info = extractSheetId(sheetUrl);
+      if (!info) { reject(new Error('Not a Google Sheets URL')); return; }
+
+      // Build the Google Visualization API URL (supports JSONP via callback)
+      let vizUrl;
+      if (info.type === 'pub') {
+        vizUrl = `https://docs.google.com/spreadsheets/d/e/${info.id}/gviz/tq?tqx=out:csv`;
+      } else {
+        vizUrl = `https://docs.google.com/spreadsheets/d/${info.id}/gviz/tq?tqx=out:csv`;
+      }
+      // Extract gid if present
+      const gidMatch = sheetUrl.match(/gid=(\d+)/);
+      if (gidMatch) vizUrl += `&gid=${gidMatch[1]}`;
+
+      // Use a hidden iframe + fetch approach won't work, so use script-based CSV
+      // Actually, the /gviz/tq endpoint with out:csv also has CORS issues from file://
+      // Use the JSONP callback approach instead:
+      const callbackName = '_gcb_' + Math.random().toString(36).slice(2);
+      let jsonVizUrl;
+      if (info.type === 'pub') {
+        jsonVizUrl = `https://docs.google.com/spreadsheets/d/e/${info.id}/gviz/tq?tqx=responseHandler:${callbackName}`;
+      } else {
+        jsonVizUrl = `https://docs.google.com/spreadsheets/d/${info.id}/gviz/tq?tqx=responseHandler:${callbackName}`;
+      }
+      if (gidMatch) jsonVizUrl += `&gid=${gidMatch[1]}`;
+
+      const timeout = setTimeout(() => {
+        delete window[callbackName];
+        script.remove();
+        reject(new Error('Timeout'));
+      }, 15000);
+
+      window[callbackName] = (response) => {
+        clearTimeout(timeout);
+        delete window[callbackName];
+        script.remove();
+        if (response && response.table) {
+          // Convert Google Visualization table to rows
+          const cols = response.table.cols.map(c => c.label || c.id);
+          const rows = response.table.rows.map(r => {
+            const obj = {};
+            r.c.forEach((cell, i) => {
+              if (cell) {
+                obj[cols[i]] = cell.v != null ? String(cell.v) : '';
+                // Handle Date objects from gviz
+                if (cell.v && typeof cell.v === 'string' && cell.v.startsWith('Date(')) {
+                  const parts = cell.v.match(/Date\((\d+),(\d+),(\d+)\)/);
+                  if (parts) {
+                    const y = parts[1], m = String(parseInt(parts[2])+1).padStart(2,'0'), d = parts[2+1].padStart(2,'0');
+                    obj[cols[i]] = `${y}-${m}-${d}`;
+                  }
+                }
+              } else {
+                obj[cols[i]] = '';
+              }
+            });
+            return obj;
+          });
+          resolve(rows);
+        } else {
+          reject(new Error(response?.errors?.[0]?.message || 'Unknown error'));
+        }
+      };
+
+      const script = document.createElement('script');
+      script.src = jsonVizUrl;
+      script.onerror = () => {
+        clearTimeout(timeout);
+        delete window[callbackName];
+        reject(new Error('Script load failed'));
+      };
+      document.head.appendChild(script);
+    });
+  }, [extractSheetId]);
+
+  const fetchSheet = useCallback(async () => {
+    if (!url.trim()) return;
+    setLoading(true);
+    setError(null);
+    localStorage.setItem('campaignCalendarUrl', url.trim());
+    const sheetUrl = url.trim();
+
+    // Strategy 1: Direct fetch (works from http/https origins)
+    try {
+      const resp = await fetch(sheetUrl);
+      if (resp.ok) {
+        const text = await resp.text();
+        if (text && !text.trimStart().startsWith('<!DOCTYPE')) {
+          setLoading(false);
+          parseCsvText(text);
+          return;
+        }
+      }
+    } catch (e) { /* CORS from file:// — expected, try JSONP */ }
+
+    // Strategy 2: JSONP via Google Visualization API (bypasses CORS from file://)
+    try {
+      const rows = await fetchViaJsonp(sheetUrl);
+      setLoading(false);
+      if (rows.length === 0) {
+        setError('Sheet is empty. Add some campaign rows and try again.');
+        return;
+      }
+      const campaigns = normalizeRows(rows);
+      if (!campaigns.length) {
+        setError('No valid campaigns found. Check column names (Campaign Name, Channel, Start Date, End Date).');
+        return;
+      }
+      onData(campaigns);
+      return;
+    } catch (e) { /* JSONP failed */ }
+
+    setLoading(false);
+    setError('Could not fetch the sheet. Make sure it is published to web (File → Share → Publish to web). Or download as .csv and use the Upload button.');
+  }, [url, onData, setLoading, parseCsvText, fetchViaJsonp]);
+
+  // Auto-fetch if URL was saved
+  useEffect(() => {
+    if (url.trim()) fetchSheet();
+  }, []); // eslint-disable-line
+
+  const handleFile = useCallback((file) => {
+    if (!file) return;
+    setLoading(true);
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        const campaigns = normalizeRows(rows);
+        setLoading(false);
+        if (!campaigns.length) {
+          setError('No valid campaigns found in file.');
+          return;
+        }
+        onData(campaigns);
+      } catch (ex) {
+        setLoading(false);
+        setError(`File parse error: ${ex.message}`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }, [onData, setLoading]);
+
+  const onDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
+
+  return (
+    <div>
+      <div
+        className={`data-loader ${dragOver ? 'dropzone-active' : ''}`}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onDrop}
+      >
+        <input
+          type="text"
+          placeholder="Paste Google Sheet published CSV URL..."
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && fetchSheet()}
+        />
+        <button className="btn btn-primary" onClick={fetchSheet} disabled={loading || !url.trim()}>
+          {loading ? <><span className="spinner"></span> Loading...</> : 'Load Sheet'}
+        </button>
+        <div className="file-upload">
+          <button className="btn btn-secondary">Upload .xlsx / .csv</button>
+          <input
+            type="file"
+            ref={fileRef}
+            accept=".xlsx,.xls,.csv"
+            onChange={(e) => handleFile(e.target.files[0])}
+          />
+        </div>
+        <button className="btn btn-icon" onClick={fetchSheet} disabled={loading || !url.trim()} title="Refresh data">
+          &#x21bb;
+        </button>
+      </div>
+      {error && <div className="error-msg">{error}</div>}
+    </div>
+  );
+}
+
+function FilterDropdown({ label, options, selected, onToggle }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  const count = selected.length;
+
+  return (
+    <div className="filter-group" ref={ref}>
+      <button
+        className={`filter-btn ${count > 0 ? 'active' : ''}`}
+        onClick={() => setOpen(!open)}
+      >
+        {label}
+        {count > 0 && <span className="count">{count}</span>}
+        <span className="arrow">{open ? '\u25B2' : '\u25BC'}</span>
+      </button>
+      {open && (
+        <div className="filter-dropdown">
+          {options.map((opt) => (
+            <label key={opt} className="filter-option">
+              <input
+                type="checkbox"
+                checked={selected.includes(opt)}
+                onChange={() => onToggle(opt)}
+              />
+              {opt}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FilterBar({ campaigns, filters, setFilters }) {
+  const channels = useMemo(() => [...new Set(campaigns.map(c => c.channel))].sort(), [campaigns]);
+  const markets = useMemo(() => [...new Set(campaigns.map(c => c.market))].sort(), [campaigns]);
+  const statuses = useMemo(() => [...new Set(campaigns.map(c => c.status))].sort(), [campaigns]);
+
+  const toggle = (key, val) => {
+    setFilters(prev => {
+      const arr = prev[key];
+      return { ...prev, [key]: arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val] };
+    });
+  };
+
+  const hasFilters = filters.channels.length || filters.markets.length || filters.statuses.length;
+
+  return (
+    <div className="filter-bar">
+      <label>Filters:</label>
+      <FilterDropdown label="Channel" options={channels} selected={filters.channels} onToggle={(v) => toggle('channels', v)} />
+      <FilterDropdown label="Market" options={markets} selected={filters.markets} onToggle={(v) => toggle('markets', v)} />
+      <FilterDropdown label="Status" options={statuses} selected={filters.statuses} onToggle={(v) => toggle('statuses', v)} />
+      {hasFilters && (
+        <button className="btn btn-icon" onClick={() => setFilters({ channels: [], markets: [], statuses: [] })}>
+          Clear filters
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SummaryBar({ campaigns }) {
+  const active = campaigns.filter(c => c.status === 'active').length;
+  const planned = campaigns.filter(c => c.status === 'planned').length;
+  const totalBudget = campaigns.reduce((sum, c) => sum + (c.budget || 0), 0);
+
+  return (
+    <div className="summary-bar">
+      <div className="summary-item">
+        <strong>{campaigns.length}</strong> campaigns
+      </div>
+      <div className="summary-item">
+        <strong>{active}</strong> active
+      </div>
+      <div className="summary-item">
+        <strong>{planned}</strong> planned
+      </div>
+      {totalBudget > 0 && (
+        <div className="summary-item">
+          <strong>&euro;{totalBudget.toLocaleString('nl-NL', { minimumFractionDigits: 0 })}</strong> total budget
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Tooltip({ data, position }) {
+  if (!data) return null;
+  const fmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const days = Math.ceil((data.endDate - data.startDate) / (1000 * 60 * 60 * 24)) + 1;
+
+  return (
+    <div className="tooltip" style={{ left: position.x + 12, top: position.y - 10 }}>
+      <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 14 }}>{data.name}</div>
+      <div className="tooltip-row"><span className="tooltip-label">Channel</span><span className="tooltip-value">{data.channel}</span></div>
+      <div className="tooltip-row"><span className="tooltip-label">Market</span><span className="tooltip-value">{data.market}</span></div>
+      <div className="tooltip-row"><span className="tooltip-label">Dates</span><span className="tooltip-value">{fmt(data.startDate)} — {fmt(data.endDate)}</span></div>
+      <div className="tooltip-row"><span className="tooltip-label">Duration</span><span className="tooltip-value">{days} day{days !== 1 ? 's' : ''}</span></div>
+      <div className="tooltip-row"><span className="tooltip-label">Status</span><span className="tooltip-value" style={{ textTransform: 'capitalize' }}>{data.status}</span></div>
+      {data.budget != null && <div className="tooltip-row"><span className="tooltip-label">Budget</span><span className="tooltip-value">&euro;{data.budget.toLocaleString('nl-NL')}</span></div>}
+      {data.notes && <div className="tooltip-row"><span className="tooltip-label">Notes</span><span className="tooltip-value">{data.notes}</span></div>}
+    </div>
+  );
+}
+
+function GanttChart({ campaigns }) {
+  const [tooltip, setTooltip] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const timelineRef = useRef(null);
+
+  // Calculate date range
+  const { minDate, maxDate, totalDays } = useMemo(() => {
+    if (!campaigns.length) return { minDate: new Date(), maxDate: new Date(), totalDays: 1 };
+    let min = campaigns[0].startDate;
+    let max = campaigns[0].endDate;
+    campaigns.forEach(c => {
+      if (c.startDate < min) min = c.startDate;
+      if (c.endDate > max) max = c.endDate;
+    });
+    // Add 1-week padding each side
+    const padded_min = new Date(min);
+    padded_min.setDate(padded_min.getDate() - 7);
+    const padded_max = new Date(max);
+    padded_max.setDate(padded_max.getDate() + 7);
+    const days = Math.ceil((padded_max - padded_min) / (1000 * 60 * 60 * 24));
+    return { minDate: padded_min, maxDate: padded_max, totalDays: Math.max(days, 7) };
+  }, [campaigns]);
+
+  // Generate month/week headers
+  const { months, weeks } = useMemo(() => {
+    const months = [];
+    const weeks = [];
+    const d = new Date(minDate);
+    d.setDate(1); // Start at first of month
+    if (d > minDate) d.setMonth(d.getMonth() - 1);
+
+    // Months
+    const mEnd = new Date(maxDate);
+    mEnd.setMonth(mEnd.getMonth() + 1);
+    while (d <= mEnd) {
+      const monthStart = new Date(d);
+      const nextMonth = new Date(d);
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      const startOffset = Math.max(0, (monthStart - minDate) / (1000*60*60*24));
+      const endOffset = Math.min(totalDays, (nextMonth - minDate) / (1000*60*60*24));
+      if (endOffset > 0 && startOffset < totalDays) {
+        months.push({
+          label: monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          startPct: (startOffset / totalDays) * 100,
+          widthPct: ((endOffset - startOffset) / totalDays) * 100,
+        });
+      }
+      d.setMonth(d.getMonth() + 1);
+    }
+
+    // Weeks (every Monday)
+    const wd = new Date(minDate);
+    // Move to next Monday
+    const dayOfWeek = wd.getDay();
+    const daysUntilMon = dayOfWeek === 0 ? 1 : (dayOfWeek === 1 ? 0 : 8 - dayOfWeek);
+    wd.setDate(wd.getDate() + daysUntilMon);
+    while (wd <= maxDate) {
+      const offset = (wd - minDate) / (1000*60*60*24);
+      const pct = (offset / totalDays) * 100;
+      weeks.push({
+        label: `W${getWeekNumber(wd)}`,
+        pct,
+        widthPct: (7 / totalDays) * 100,
+        date: new Date(wd),
+      });
+      wd.setDate(wd.getDate() + 7);
+    }
+
+    return { months, weeks };
+  }, [minDate, maxDate, totalDays]);
+
+  // Today marker position
+  const todayPct = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const offset = (today - minDate) / (1000*60*60*24);
+    const pct = (offset / totalDays) * 100;
+    return pct >= 0 && pct <= 100 ? pct : null;
+  }, [minDate, totalDays]);
+
+  // Pixels per day — use minimum 18px/day for readability
+  const pxPerDay = Math.max(18, 14);
+  const timelineWidth = totalDays * pxPerDay;
+
+  const handleMouseMove = (e, campaign) => {
+    setTooltipPos({ x: e.clientX, y: e.clientY });
+    setTooltip(campaign);
+  };
+
+  // Sort campaigns: active first, then by start date
+  const sorted = useMemo(() => {
+    return [...campaigns].sort((a, b) => {
+      const statusOrder = { active: 0, planned: 1, completed: 2 };
+      const sa = statusOrder[a.status] ?? 1;
+      const sb = statusOrder[b.status] ?? 1;
+      if (sa !== sb) return sa - sb;
+      return a.startDate - b.startDate;
+    });
+  }, [campaigns]);
+
+  return (
+    <div className="gantt-wrapper">
+      <div className="gantt-scroll">
+        <div style={{ display: 'grid', gridTemplateColumns: `220px ${timelineWidth}px` }}>
+          {/* Header row */}
+          <div className="gantt-name-header" style={{ position: 'sticky', top: 0, left: 0, zIndex: 20 }}>
+            Campaign
+          </div>
+          <div className="gantt-timeline-header" style={{ width: timelineWidth }}>
+            <div className="timeline-months">
+              {months.map((m, i) => (
+                <div key={i} className="timeline-month" style={{ width: `${m.widthPct}%`, marginLeft: i === 0 ? `${m.startPct}%` : 0 }}>
+                  {m.label}
+                </div>
+              ))}
+            </div>
+            <div className="timeline-weeks">
+              {weeks.map((w, i) => (
+                <div key={i} className="timeline-week" style={{ width: `${w.widthPct}%`, marginLeft: i === 0 ? `${w.pct}%` : 0 }}>
+                  {w.label}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Campaign rows */}
+          {sorted.map((campaign, i) => {
+            const startOffset = (campaign.startDate - minDate) / (1000*60*60*24);
+            const duration = Math.max(1, Math.ceil((campaign.endDate - campaign.startDate) / (1000*60*60*24)) + 1);
+            const leftPct = (startOffset / totalDays) * 100;
+            const widthPct = (duration / totalDays) * 100;
+            const color = getChannelColor(campaign.channel);
+            const barOpacity = campaign.status === 'completed' ? 0.5 : campaign.status === 'planned' ? 0.75 : 1;
+
+            return (
+              <React.Fragment key={i}>
+                <div className="gantt-name-cell" title={campaign.name}>
+                  <span className="channel-dot" style={{ background: color }}></span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{campaign.name}</span>
+                </div>
+                <div className="gantt-timeline-cell" style={{ position: 'relative' }}>
+                  {/* Week stripes */}
+                  {weeks.map((w, wi) => (
+                    <div key={wi} className="week-stripe" style={{ left: `${w.pct}%`, width: `${w.widthPct}%` }} />
+                  ))}
+                  {/* Today marker */}
+                  {todayPct != null && <div className="today-marker" style={{ left: `${todayPct}%` }} />}
+                  {/* Campaign bar */}
+                  <div
+                    className="campaign-bar"
+                    style={{
+                      left: `${leftPct}%`,
+                      width: `${widthPct}%`,
+                      background: color,
+                      opacity: barOpacity,
+                    }}
+                    onMouseMove={(e) => handleMouseMove(e, campaign)}
+                    onMouseLeave={() => setTooltip(null)}
+                  >
+                    {widthPct > 8 ? campaign.name : ''}
+                  </div>
+                </div>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
+      <Tooltip data={tooltip} position={tooltipPos} />
+    </div>
+  );
+}
+
+function getWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+}
+
+function Legend() {
+  const items = [
+    { label: 'Meta', color: CHANNEL_COLORS.meta },
+    { label: 'Bol.com', color: CHANNEL_COLORS.bol },
+    { label: 'Shopify', color: CHANNEL_COLORS.shopify },
+    { label: 'Mailchimp', color: CHANNEL_COLORS.mailchimp },
+    { label: 'Email', color: CHANNEL_COLORS.email },
+    { label: 'Google', color: CHANNEL_COLORS.google },
+    { label: 'LinkedIn', color: CHANNEL_COLORS.linkedin },
+  ];
+  return (
+    <div className="legend">
+      {items.map(item => (
+        <div key={item.label} className="legend-item">
+          <span className="legend-dot" style={{ background: item.color }}></span>
+          {item.label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="empty-state">
+      <h2>No campaigns loaded</h2>
+      <p>Connect a Google Sheet or upload a file to see your campaign timeline.</p>
+      <div className="steps">
+        <strong>Google Sheets setup:</strong>
+        <ol>
+          <li>Create a sheet with columns: <code>Campaign Name</code>, <code>Channel</code>, <code>Market</code>, <code>Start Date</code>, <code>End Date</code>, <code>Status</code>, <code>Budget</code>, <code>Notes</code></li>
+          <li>Go to <strong>File &rarr; Share &rarr; Publish to web</strong></li>
+          <li>Select the sheet tab and choose <strong>CSV</strong> format</li>
+          <li>Click <strong>Publish</strong> and copy the URL</li>
+          <li>Paste the URL above and click <strong>Load Sheet</strong></li>
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [campaigns, setCampaigns] = useState([]);
+  const [filters, setFilters] = useState({ channels: [], markets: [], statuses: [] });
+  const [loading, setLoading] = useState(false);
+
+  const filtered = useMemo(() => {
+    return campaigns.filter(c => {
+      if (filters.channels.length && !filters.channels.includes(c.channel)) return false;
+      if (filters.markets.length && !filters.markets.includes(c.market)) return false;
+      if (filters.statuses.length && !filters.statuses.includes(c.status)) return false;
+      return true;
+    });
+  }, [campaigns, filters]);
+
+  return (
+    <div>
+      <div className="header">
+        <h1><span>&#x1F4CA;</span> Campaign Calendar</h1>
+      </div>
+      <DataLoader onData={setCampaigns} loading={loading} setLoading={setLoading} />
+      {campaigns.length > 0 && (
+        <>
+          <FilterBar campaigns={campaigns} filters={filters} setFilters={setFilters} />
+          <SummaryBar campaigns={filtered} />
+          <GanttChart campaigns={filtered} />
+          <Legend />
+        </>
+      )}
+      {!loading && campaigns.length === 0 && <EmptyState />}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
