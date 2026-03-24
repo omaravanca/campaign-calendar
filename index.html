@@ -485,29 +485,25 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-// Channel colors
-const CHANNEL_COLORS = {
-  meta:      '#1877F2',
-  facebook:  '#1877F2',
-  instagram: '#E4405F',
-  bol:       '#0000FF',
-  'bol.com': '#0000FF',
-  shopify:   '#96BF48',
-  mailchimp: '#FFE01B',
-  email:     '#FF6B35',
-  google:    '#34A853',
-  tiktok:    '#010101',
-  linkedin:  '#0A66C2',
-  ah:        '#00A0E2',
-  'albert heijn': '#00A0E2',
-  tinq:      '#E31937',
-  other:     '#6c757d',
-};
+// Distinct campaign color palette — 20 visually separated colors
+const CAMPAIGN_PALETTE = [
+  '#4361ee', '#e63946', '#2a9d8f', '#e9c46a', '#f4845f',
+  '#7209b7', '#00b4d8', '#606c38', '#ef476f', '#118ab2',
+  '#8338ec', '#06d6a0', '#fb8500', '#3a86ff', '#ff006e',
+  '#9b5de5', '#00f5d4', '#fee440', '#f15bb5', '#00bbf9',
+];
 
-function getChannelColor(channel) {
-  if (!channel) return CHANNEL_COLORS.other;
-  const key = channel.toLowerCase().trim();
-  return CHANNEL_COLORS[key] || CHANNEL_COLORS.other;
+// Assign unique colors to campaigns — no two campaigns share a color
+function buildCampaignColorMap(campaigns) {
+  const map = {};
+  let idx = 0;
+  campaigns.forEach(c => {
+    if (!map[c.name]) {
+      map[c.name] = CAMPAIGN_PALETTE[idx % CAMPAIGN_PALETTE.length];
+      idx++;
+    }
+  });
+  return map;
 }
 
 // Parse dates — handles ISO (2026-03-01) and EU (01/03/2026, 01-03-2026)
@@ -1110,6 +1106,9 @@ function GanttChart({ campaigns }) {
     });
   }, [campaigns]);
 
+  // Unique color per campaign
+  const colorMap = useMemo(() => buildCampaignColorMap(sorted), [sorted]);
+
   return (
     <div className="gantt-wrapper">
       <div className="gantt-scroll">
@@ -1141,7 +1140,7 @@ function GanttChart({ campaigns }) {
             const duration = Math.max(1, Math.ceil((campaign.endDate - campaign.startDate) / (1000*60*60*24)) + 1);
             const leftPct = (startOffset / totalDays) * 100;
             const widthPct = (duration / totalDays) * 100;
-            const color = getChannelColor(campaign.channel);
+            const color = colorMap[campaign.name];
             const barOpacity = campaign.status === 'completed' ? 0.5 : campaign.status === 'planned' ? 0.75 : 1;
 
             return (
@@ -1189,25 +1188,6 @@ function getWeekNumber(date) {
   return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
-function Legend({ campaigns }) {
-  const items = useMemo(() => {
-    const channels = [...new Set(campaigns.map(c => c.channel))].sort();
-    return channels.map(ch => ({ label: ch, color: getChannelColor(ch) }));
-  }, [campaigns]);
-
-  if (!items.length) return null;
-
-  return (
-    <div className="legend">
-      {items.map(item => (
-        <div key={item.label} className="legend-item">
-          <span className="legend-dot" style={{ background: item.color }}></span>
-          {item.label}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function EmptyState() {
   return (
@@ -1253,7 +1233,6 @@ function App() {
           <FilterBar campaigns={campaigns} filters={filters} setFilters={setFilters} />
           <SummaryBar campaigns={filtered} />
           <GanttChart campaigns={filtered} />
-          <Legend campaigns={filtered} />
         </>
       )}
       {!loading && campaigns.length === 0 && <EmptyState />}
