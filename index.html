@@ -1016,7 +1016,7 @@ function Tooltip({ data, position }) {
   );
 }
 
-function GanttChart({ campaigns }) {
+function GanttChart({ campaigns, colorMap }) {
   const [tooltip, setTooltip] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const timelineRef = useRef(null);
@@ -1116,8 +1116,6 @@ function GanttChart({ campaigns }) {
     });
   }, [campaigns]);
 
-  // Unique color per campaign
-  const colorMap = useMemo(() => buildCampaignColorMap(sorted), [sorted]);
 
   return (
     <div className="gantt-wrapper">
@@ -1235,6 +1233,9 @@ function App() {
     });
   }, [campaigns, filters]);
 
+  // Stable color map based on ALL campaigns, not filtered
+  const colorMap = useMemo(() => buildCampaignColorMap(campaigns), [campaigns]);
+
   return (
     <div>
       <div className="header">
@@ -1245,7 +1246,7 @@ function App() {
         <>
           <FilterBar campaigns={campaigns} filters={filters} setFilters={setFilters} />
           <SummaryBar campaigns={filtered} />
-          <GanttChart campaigns={filtered} />
+          <GanttChart campaigns={filtered} colorMap={colorMap} />
         </>
       )}
       {!loading && campaigns.length === 0 && <EmptyState />}
