@@ -690,7 +690,8 @@ function normalizeRows(rawRows) {
 // ---- Components ----
 
 function DataLoader({ onData, loading, setLoading }) {
-  const [url, setUrl] = useState(() => localStorage.getItem('campaignCalendarUrl') || '');
+  const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRovWX6Hdzw1Pdl3Tfo6Y7o7WfWv3LKL72GJ9F9m0w-zlZuU2k2SVxS0QCmn4-4WUMQCOsOCfuygshN/pub?gid=0&single=true&output=csv';
+  const [url, setUrl] = useState(() => localStorage.getItem('campaignCalendarUrl') || DEFAULT_SHEET_URL);
   const [error, setError] = useState(null);
   const fileRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
