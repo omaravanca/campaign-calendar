@@ -896,7 +896,17 @@ function FilterDropdown({ label, options, selected, onToggle }) {
 
 function FilterBar({ campaigns, filters, setFilters }) {
   const channels = useMemo(() => [...new Set(campaigns.map(c => c.channel))].sort(), [campaigns]);
-  const markets = useMemo(() => [...new Set(campaigns.map(c => c.market))].sort(), [campaigns]);
+  const markets = useMemo(() => {
+    const all = new Set();
+    campaigns.forEach(c => {
+      // Split "NL & BE" or "NL, BE" or "NL / BE" into individual markets
+      String(c.market).split(/[&,\/]/).forEach(m => {
+        const trimmed = m.trim();
+        if (trimmed) all.add(trimmed);
+      });
+    });
+    return [...all].sort();
+  }, [campaigns]);
   const statuses = useMemo(() => [...new Set(campaigns.map(c => c.status))].sort(), [campaigns]);
 
   const toggle = (key, val) => {
@@ -1216,7 +1226,10 @@ function App() {
   const filtered = useMemo(() => {
     return campaigns.filter(c => {
       if (filters.channels.length && !filters.channels.includes(c.channel)) return false;
-      if (filters.markets.length && !filters.markets.includes(c.market)) return false;
+      if (filters.markets.length) {
+        const campaignMarkets = String(c.market).split(/[&,\/]/).map(m => m.trim());
+        if (!filters.markets.some(fm => campaignMarkets.includes(fm))) return false;
+      }
       if (filters.statuses.length && !filters.statuses.includes(c.status)) return false;
       return true;
     });
