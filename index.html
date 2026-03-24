@@ -513,7 +513,7 @@
 
   /* Login gate */
   #login-gate {
-    display: none;
+    display: flex;
     position: fixed;
     inset: 0;
     background: var(--bg);
@@ -576,7 +576,14 @@
     margin-top: 8px;
     min-height: 20px;
   }
+  #app-content { display: none; }
 </style>
+<script>
+  /* If already authenticated, swap visibility immediately before paint */
+  if (CC_AUTHED) {
+    document.write('<style>#login-gate{display:none!important}#app-content{display:block!important}</style>');
+  }
+</script>
 </head>
 <body>
 <div id="login-gate">
