@@ -5,40 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Campaign Calendar — Avanca / Hombli</title>
 
-<!-- Password gate — loads before anything else -->
+<!-- Password gate -->
+<style>
+  #app-content.locked { display: none; }
+  #login-gate.unlocked { display: none; }
+</style>
 <script>
-(function() {
-  // SHA-256 hash of "avanca"
-  const HASH = 'acee6f232d65d5dd76455ed96d94eea1c46f0ddb6f7e4f8e64d728797b5a3f3c';
-  async function sha256(str) {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-  const saved = sessionStorage.getItem('cc_auth');
-  if (saved === HASH) return; // Already authenticated this session
-  // Hide app content immediately via CSS
-  document.write('<style>#app-content{display:none !important}#login-gate{display:flex !important}</style>');
-  // Set up login form
-  document.addEventListener('DOMContentLoaded', async function() {
-    const form = document.getElementById('login-form');
-    const input = document.getElementById('login-password');
-    const error = document.getElementById('login-error');
-    input.focus();
-    form.addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const hash = await sha256(input.value);
-      if (hash === HASH) {
-        sessionStorage.setItem('cc_auth', HASH);
-        document.getElementById('login-gate').style.display = 'none';
-        document.getElementById('app-content').style.display = 'block';
-      } else {
-        error.textContent = 'Incorrect password';
-        input.value = '';
-        input.focus();
-      }
-    });
-  });
-})();
+  var CC_HASH = 'acee6f232d65d5dd76455ed96d94eea1c46f0ddb6f7e4f8e64d728797b5a3f3c';
+  var CC_AUTHED = sessionStorage.getItem('cc_auth') === CC_HASH;
 </script>
 
 <!-- React 18 -->
@@ -609,7 +583,7 @@
 </style>
 </head>
 <body>
-<div id="login-gate">
+<script>document.write('<div id="login-gate" class="' + (CC_AUTHED ? 'unlocked' : '') + '">')</script>
   <div class="login-box">
     <h2>Campaign Calendar</h2>
     <p>Enter password to access the dashboard</p>
@@ -620,7 +594,7 @@
     <div id="login-error"></div>
   </div>
 </div>
-<div id="app-content">
+<script>document.write('<div id="app-content" class="' + (CC_AUTHED ? '' : 'locked') + '">')</script>
 <div id="root"></div>
 
 <script type="text/babel">
@@ -1449,5 +1423,32 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
 </script>
 </div>
+<script>
+if (!CC_AUTHED) {
+  (function() {
+    async function sha256(str) {
+      var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+    }
+    var form = document.getElementById('login-form');
+    var input = document.getElementById('login-password');
+    var error = document.getElementById('login-error');
+    input.focus();
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      var hash = await sha256(input.value);
+      if (hash === CC_HASH) {
+        sessionStorage.setItem('cc_auth', CC_HASH);
+        document.getElementById('login-gate').classList.add('unlocked');
+        document.getElementById('app-content').classList.remove('locked');
+      } else {
+        error.textContent = 'Incorrect password';
+        input.value = '';
+        input.focus();
+      }
+    });
+  })();
+}
+</script>
 </body>
 </html>
