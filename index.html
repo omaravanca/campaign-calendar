@@ -335,38 +335,35 @@
     z-index: 5;
   }
 
-  /* Today marker */
+  /* Today marker — thin line in data rows */
   .today-marker {
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 1px;
-    border-left: 1px dashed var(--danger);
-    background: none;
-    z-index: 2;
+    width: 0;
+    border-left: 1px dashed rgba(230, 57, 70, 0.35);
+    z-index: 1;
     pointer-events: none;
   }
+  /* Today marker — label + line in the header */
   .today-marker-header {
     position: absolute;
-    bottom: 0;
-    width: 1px;
-    border-left: 1px dashed var(--danger);
-    background: none;
+    top: 0;
+    bottom: -4px;
+    width: 0;
+    border-left: 2px solid var(--danger);
     z-index: 16;
     pointer-events: none;
-    top: 0;
   }
   .today-marker-header::after {
-    content: 'Today';
+    content: '';
     position: absolute;
-    bottom: 2px;
-    left: 4px;
-    font-size: 9px;
-    color: var(--danger);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    white-space: nowrap;
+    top: -3px;
+    left: -5px;
+    width: 8px;
+    height: 8px;
+    background: var(--danger);
+    border-radius: 50%;
   }
 
   /* Tooltip */
