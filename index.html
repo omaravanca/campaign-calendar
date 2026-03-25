@@ -789,56 +789,50 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-// Distinct campaign color palette — 20 visually separated colors
-const CAMPAIGN_PALETTE = [
-  '#4361ee', '#e63946', '#2a9d8f', '#e9c46a', '#f4845f',
-  '#7209b7', '#00b4d8', '#606c38', '#ef476f', '#118ab2',
-  '#8338ec', '#06d6a0', '#fb8500', '#3a86ff', '#ff006e',
-  '#9b5de5', '#00f5d4', '#fee440', '#f15bb5', '#00bbf9',
+// Channel brand colors — visually distinct, matching real brand identities
+const CHANNEL_COLORS = {
+  'bol.com':    '#0000C4',  // Bol.com blue
+  'bol':        '#0000C4',
+  'ah':         '#00ADE6',  // Albert Heijn sky blue
+  'albert heijn':'#00ADE6',
+  'tinq':       '#E31937',  // Tinq red
+  'meta':       '#8B5CF6',  // Meta purple
+  'facebook':   '#8B5CF6',
+  'instagram':  '#8B5CF6',
+  'google':     '#F59E0B',  // Google amber
+  'google ads': '#F59E0B',
+  'shopify':    '#95BF47',  // Shopify green
+  'amazon':     '#FF9900',  // Amazon orange
+  'coolblue':   '#0090E3',  // Coolblue blue
+  'mediamarkt': '#DF0000',  // MediaMarkt red
+  'blokker':    '#E87400',  // Blokker orange
+  'action':     '#0063AF',  // Action blue
+  'hema':       '#E10A19',  // HEMA red
+  'tiktok':     '#010101',  // TikTok black
+  'linkedin':   '#0A66C2',  // LinkedIn blue
+  'email':      '#6366F1',  // Email indigo
+  'praxis':     '#00843D',  // Praxis green
+  'gamma':      '#FFD100',  // Gamma yellow
+  'hornbach':   '#E95E0F',  // Hornbach orange
+};
+
+// Fallback palette for unknown channels
+const FALLBACK_COLORS = [
+  '#6B7280', '#059669', '#DC2626', '#7C3AED', '#D97706',
+  '#2563EB', '#DB2777', '#0D9488', '#CA8A04', '#4F46E5',
 ];
 
-// Deterministic hash from campaign name — always returns same number for same name
-function hashName(name) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) {
-    h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+function getChannelColor(channel) {
+  const key = String(channel).toLowerCase().trim();
+  if (CHANNEL_COLORS[key]) return CHANNEL_COLORS[key];
+  // Partial match (e.g. "Bol.com NL" still matches "bol.com")
+  for (const [k, v] of Object.entries(CHANNEL_COLORS)) {
+    if (key.includes(k) || k.includes(key)) return v;
   }
-  return Math.abs(h);
-}
-
-// Assign unique colors to campaigns — deterministic by name, no overlaps
-function buildCampaignColorMap(campaigns) {
-  const names = [...new Set(campaigns.map(c => c.name))];
-  const map = {};
-  const used = new Set();
-
-  // First pass: assign each campaign its hashed color if available
-  names.forEach(name => {
-    const preferred = hashName(name) % CAMPAIGN_PALETTE.length;
-    if (!used.has(preferred)) {
-      map[name] = CAMPAIGN_PALETTE[preferred];
-      used.add(preferred);
-    }
-  });
-
-  // Second pass: resolve collisions — assign next unused color
-  names.forEach(name => {
-    if (!map[name]) {
-      for (let i = 0; i < CAMPAIGN_PALETTE.length; i++) {
-        if (!used.has(i)) {
-          map[name] = CAMPAIGN_PALETTE[i];
-          used.add(i);
-          break;
-        }
-      }
-      // If all 20 used, cycle with hash offset
-      if (!map[name]) {
-        map[name] = CAMPAIGN_PALETTE[hashName(name) % CAMPAIGN_PALETTE.length];
-      }
-    }
-  });
-
-  return map;
+  // Deterministic fallback from channel name
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = ((h << 5) - h + key.charCodeAt(i)) | 0;
+  return FALLBACK_COLORS[Math.abs(h) % FALLBACK_COLORS.length];
 }
 
 // Parse dates — handles ISO (2026-03-01) and EU (01/03/2026, 01-03-2026)
@@ -1359,7 +1353,7 @@ function Tooltip({ data, position, pinned, onClose }) {
   );
 }
 
-function GanttChart({ campaigns, colorMap }) {
+function GanttChart({ campaigns }) {
   const [hoverData, setHoverData] = useState(null);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
   const [pinned, setPinned] = useState(null);
@@ -1509,6 +1503,7 @@ function GanttChart({ campaigns, colorMap }) {
           {channelGroups.map(([channel, channelCampaigns], i) => (
             <React.Fragment key={channel}>
               <div className="gantt-name-cell" title={channel}>
+                <span className="channel-dot" style={{ background: getChannelColor(channel) }} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>{channel}</span>
                 <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 'auto' }}>{channelCampaigns.length}</span>
               </div>
@@ -1525,7 +1520,7 @@ function GanttChart({ campaigns, colorMap }) {
                   const duration = Math.max(1, Math.ceil((campaign.endDate - campaign.startDate) / (1000*60*60*24)) + 1);
                   const leftPct = (startOffset / totalDays) * 100;
                   const widthPct = (duration / totalDays) * 100;
-                  const color = colorMap[campaign.name];
+                  const color = getChannelColor(campaign.channel);
                   const barOpacity = campaign.status === 'completed' ? 0.5 : campaign.status === 'planned' ? 0.75 : 1;
                   return (
                     <div
@@ -1600,9 +1595,6 @@ function App() {
     });
   }, [campaigns, filters]);
 
-  // Stable color map based on ALL campaigns, not filtered
-  const colorMap = useMemo(() => buildCampaignColorMap(campaigns), [campaigns]);
-
   return (
     <div>
       <div className="header">
@@ -1613,7 +1605,7 @@ function App() {
         <>
           <FilterBar campaigns={campaigns} filters={filters} setFilters={setFilters} />
           <SummaryBar campaigns={filtered} />
-          <GanttChart campaigns={filtered} colorMap={colorMap} />
+          <GanttChart campaigns={filtered} />
         </>
       )}
       {!loading && campaigns.length === 0 && <EmptyState />}
