@@ -1302,17 +1302,40 @@ function SummaryBar({ campaigns }) {
 }
 
 function Tooltip({ data, position, pinned, onClose }) {
+  const tooltipRef = useRef(null);
+  const [adjustedPos, setAdjustedPos] = useState(null);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+  useEffect(() => {
+    if (!data || isMobile || !tooltipRef.current) { setAdjustedPos(null); return; }
+    const el = tooltipRef.current;
+    const rect = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let x = position.x + 12;
+    let y = position.y - 10;
+    // Flip left if overflows right
+    if (x + rect.width > vw - 12) x = position.x - rect.width - 12;
+    // Flip up if overflows bottom
+    if (y + rect.height > vh - 12) y = vh - rect.height - 12;
+    // Clamp to viewport
+    if (x < 8) x = 8;
+    if (y < 8) y = 8;
+    setAdjustedPos({ x, y });
+  }, [data, position, isMobile]);
+
   if (!data) return null;
   const fmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   const days = Math.ceil((data.endDate - data.startDate) / (1000 * 60 * 60 * 24)) + 1;
   const fmtPrice = (p) => p != null && !isNaN(p) ? `\u20AC${p.toFixed(2)}` : '';
-  const isMobile = window.innerWidth <= 768;
 
-  // On mobile, tooltip is a bottom sheet (CSS controls position), so don't pass left/top
-  const style = isMobile ? {} : { left: position.x + 12, top: position.y - 10 };
+  const style = isMobile ? {} : {
+    left: adjustedPos ? adjustedPos.x : position.x + 12,
+    top: adjustedPos ? adjustedPos.y : position.y - 10,
+  };
 
   return (
-    <div className={`tooltip ${pinned ? 'pinned' : ''}`} style={style}>
+    <div ref={tooltipRef} className={`tooltip ${pinned ? 'pinned' : ''}`} style={style}>
       {pinned && <button className="tooltip-close" onClick={onClose}>&times;</button>}
       <div style={{ fontWeight: 700, marginBottom: 6, fontSize: isMobile ? 16 : 14 }}>{data.name}</div>
       <div className="tooltip-row"><span className="tooltip-label">Channel</span><span className="tooltip-value">{data.channel}</span></div>
