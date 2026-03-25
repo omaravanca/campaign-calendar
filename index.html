@@ -1195,6 +1195,7 @@ function DataLoader({ onData, loading, setLoading }) {
         jsonVizUrl = `https://docs.google.com/spreadsheets/d/${info.id}/gviz/tq?tqx=responseHandler:${callbackName}`;
       }
       if (gidMatch) jsonVizUrl += `&gid=${gidMatch[1]}`;
+      jsonVizUrl += `&_t=${Date.now()}`;
 
       const timeout = setTimeout(() => {
         delete window[callbackName];
@@ -1245,6 +1246,21 @@ function DataLoader({ onData, loading, setLoading }) {
     });
   }, [extractSheetId]);
 
+  // Build a fast Google Visualization API CSV URL (bypasses Google's aggressive pub cache)
+  const buildGvizCsvUrl = useCallback((sheetUrl) => {
+    const info = extractSheetId(sheetUrl);
+    if (!info) return null;
+    let gvizUrl;
+    if (info.type === 'pub') {
+      gvizUrl = `https://docs.google.com/spreadsheets/d/e/${info.id}/gviz/tq?tqx=out:csv`;
+    } else {
+      gvizUrl = `https://docs.google.com/spreadsheets/d/${info.id}/gviz/tq?tqx=out:csv`;
+    }
+    const gidMatch = sheetUrl.match(/gid=(\d+)/);
+    if (gidMatch) gvizUrl += `&gid=${gidMatch[1]}`;
+    return gvizUrl;
+  }, [extractSheetId]);
+
   const fetchSheet = useCallback(async () => {
     if (!url.trim()) return;
     setLoading(true);
@@ -1252,9 +1268,27 @@ function DataLoader({ onData, loading, setLoading }) {
     localStorage.setItem('campaignCalendarUrl', url.trim());
     const sheetUrl = url.trim();
 
-    // Strategy 1: Direct fetch (works from http/https origins)
+    // Strategy 1: Google Visualization API as CSV (near-realtime, no pub cache)
+    const gvizUrl = buildGvizCsvUrl(sheetUrl);
+    if (gvizUrl) {
+      try {
+        const cacheBust = gvizUrl + '&_t=' + Date.now();
+        const resp = await fetch(cacheBust, { cache: 'no-store' });
+        if (resp.ok) {
+          const text = await resp.text();
+          if (text && !text.trimStart().startsWith('<!DOCTYPE')) {
+            setLoading(false);
+            parseCsvText(text);
+            return;
+          }
+        }
+      } catch (e) { /* CORS from file:// — expected, try JSONP */ }
+    }
+
+    // Strategy 2: Direct fetch of the original URL (fallback for non-Google sources)
     try {
-      const resp = await fetch(sheetUrl);
+      const cacheBust = sheetUrl + (sheetUrl.includes('?') ? '&' : '?') + '_t=' + Date.now();
+      const resp = await fetch(cacheBust, { cache: 'no-store' });
       if (resp.ok) {
         const text = await resp.text();
         if (text && !text.trimStart().startsWith('<!DOCTYPE')) {
@@ -1265,7 +1299,7 @@ function DataLoader({ onData, loading, setLoading }) {
       }
     } catch (e) { /* CORS from file:// — expected, try JSONP */ }
 
-    // Strategy 2: JSONP via Google Visualization API (bypasses CORS from file://)
+    // Strategy 3: JSONP via Google Visualization API (bypasses CORS from file://)
     try {
       const rows = await fetchViaJsonp(sheetUrl);
       setLoading(false);
@@ -1284,11 +1318,15 @@ function DataLoader({ onData, loading, setLoading }) {
 
     setLoading(false);
     setError('Could not fetch the sheet. Make sure it is published to web (File → Share → Publish to web). Or download as .csv and use the Upload button.');
-  }, [url, onData, setLoading, parseCsvText, fetchViaJsonp]);
+  }, [url, onData, setLoading, parseCsvText, fetchViaJsonp, buildGvizCsvUrl]);
 
-  // Auto-fetch if URL was saved
+  // Auto-fetch if URL was saved, then auto-refresh every 2 minutes
   useEffect(() => {
     if (url.trim()) fetchSheet();
+    const interval = setInterval(() => {
+      if (url.trim()) fetchSheet();
+    }, 2 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []); // eslint-disable-line
 
   const handleFile = useCallback((file) => {
