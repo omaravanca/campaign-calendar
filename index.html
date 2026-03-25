@@ -1136,8 +1136,16 @@ function getConflictsForCampaign(conflicts, campaignName) {
 // ---- Components ----
 
 function DataLoader({ onData, loading, setLoading }) {
-  const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRovWX6Hdzw1Pdl3Tfo6Y7o7WfWv3LKL72GJ9F9m0w-zlZuU2k2SVxS0QCmn4-4WUMQCOsOCfuygshN/pub?gid=0&single=true&output=csv';
-  const [url, setUrl] = useState(() => localStorage.getItem('campaignCalendarUrl') || DEFAULT_SHEET_URL);
+  const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ajU7FMLTs74TcmF3cr6_oe1YF7b1yKY6XAMgUWohj7Q/edit?gid=0#gid=0';
+  const [url, setUrl] = useState(() => {
+    const saved = localStorage.getItem('campaignCalendarUrl') || '';
+    // Migrate: if saved URL is the old published key, replace with the new edit URL
+    if (saved.includes('/d/e/2PACX')) {
+      localStorage.setItem('campaignCalendarUrl', DEFAULT_SHEET_URL);
+      return DEFAULT_SHEET_URL;
+    }
+    return saved || DEFAULT_SHEET_URL;
+  });
   const [error, setError] = useState(null);
   const fileRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
