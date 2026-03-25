@@ -517,6 +517,98 @@
     background: #eef1ff !important;
   }
 
+  /* Conflict banner */
+  .conflict-banner {
+    background: #FEF3C7;
+    border: 1px solid #F59E0B;
+    border-radius: var(--radius);
+    margin: 0 24px 16px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .conflict-banner-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: #92400E;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .conflict-banner-header:hover {
+    background: rgba(245, 158, 11, 0.1);
+  }
+  .conflict-banner-header .chevron {
+    margin-left: auto;
+    font-size: 12px;
+    transition: transform 0.2s;
+  }
+  .conflict-banner-header .chevron.open {
+    transform: rotate(180deg);
+  }
+  .conflict-list {
+    border-top: 1px solid rgba(245, 158, 11, 0.3);
+    padding: 8px 16px 12px;
+  }
+  .conflict-item {
+    padding: 8px 0;
+    font-size: 13px;
+    color: #78350F;
+  }
+  .conflict-item + .conflict-item {
+    border-top: 1px solid rgba(245, 158, 11, 0.2);
+  }
+  .conflict-item-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+  .conflict-item-title .ean-code {
+    font-family: monospace;
+    font-size: 12px;
+    color: #92400E;
+  }
+  .conflict-item-campaign {
+    padding-left: 16px;
+    font-size: 12px;
+    color: #92400E;
+    line-height: 1.7;
+  }
+
+  /* Campaign bar with conflict */
+  .campaign-bar.has-conflict {
+    outline: 2px dashed #F59E0B;
+    outline-offset: -1px;
+  }
+
+  /* Tooltip conflict section */
+  .tooltip-conflicts {
+    margin-top: 8px;
+    border-top: 1px solid rgba(245, 158, 11, 0.4);
+    padding-top: 8px;
+  }
+  .tooltip-conflicts-title {
+    font-size: 11px;
+    color: #F59E0B;
+    margin-bottom: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .tooltip-conflict-item {
+    font-size: 11px;
+    color: #FCD34D;
+    padding: 2px 0;
+  }
+  .tooltip-conflict-ean {
+    font-family: monospace;
+    font-size: 10px;
+    color: #FDE68A;
+  }
+
   /* Week column stripe */
   .week-stripe {
     position: absolute;
@@ -671,6 +763,12 @@
     .timeline-week { font-size: 8px; padding: 3px 0; }
 
     .error-msg { margin: 8px 10px; font-size: 12px; }
+
+    .conflict-banner { margin: 0 10px 10px; }
+    .conflict-banner-header { padding: 8px 12px; font-size: 13px; }
+    .conflict-list { padding: 6px 12px 10px; }
+    .conflict-item { font-size: 12px; }
+    .conflict-item-campaign { font-size: 11px; }
 
     /* Tooltip becomes bottom sheet on mobile */
     .tooltip {
@@ -961,6 +1059,78 @@ function normalizeRows(rawRows) {
     }
     return { ...c, status };
   });
+}
+
+// ---- EAN Conflict Detection ----
+
+function detectConflicts(campaigns) {
+  // Build a map: EAN -> [{ campaign, product }]
+  const eanMap = new Map();
+  campaigns.forEach(campaign => {
+    if (!campaign.products) return;
+    campaign.products.forEach(product => {
+      if (!product.eans) return;
+      product.eans.forEach(ean => {
+        if (!ean) return;
+        if (!eanMap.has(ean)) eanMap.set(ean, []);
+        eanMap.get(ean).push({ campaign, product });
+      });
+    });
+  });
+
+  const conflicts = [];
+  eanMap.forEach((entries, ean) => {
+    if (entries.length < 2) return;
+    // Check pairs from different channels with overlapping dates
+    const conflicting = [];
+    for (let i = 0; i < entries.length; i++) {
+      for (let j = i + 1; j < entries.length; j++) {
+        const a = entries[i].campaign;
+        const b = entries[j].campaign;
+        if (a.channel.toLowerCase() === b.channel.toLowerCase()) continue;
+        // Overlap: A starts before B ends AND B starts before A ends
+        if (a.startDate <= b.endDate && b.startDate <= a.endDate) {
+          // Add both if not already in conflicting list
+          if (!conflicting.find(c => c.name === a.name)) {
+            conflicting.push({
+              name: a.name,
+              channel: a.channel,
+              start: a.startDate,
+              end: a.endDate,
+              price: entries[i].product.after || entries[i].product.before,
+            });
+          }
+          if (!conflicting.find(c => c.name === b.name)) {
+            conflicting.push({
+              name: b.name,
+              channel: b.channel,
+              start: b.startDate,
+              end: b.endDate,
+              price: entries[j].product.after || entries[j].product.before,
+            });
+          }
+        }
+      }
+    }
+    if (conflicting.length > 0) {
+      // Get product name from first entry
+      const productName = entries[0].product.name;
+      conflicts.push({ ean, product: productName, campaigns: conflicting });
+    }
+  });
+  return conflicts;
+}
+
+// Build a set of campaign names that have conflicts (for bar styling + tooltip)
+function getConflictingCampaignNames(conflicts) {
+  const names = new Set();
+  conflicts.forEach(c => c.campaigns.forEach(cc => names.add(cc.name)));
+  return names;
+}
+
+// Get conflicts for a specific campaign (for tooltip)
+function getConflictsForCampaign(conflicts, campaignName) {
+  return conflicts.filter(c => c.campaigns.some(cc => cc.name === campaignName));
 }
 
 // ---- Components ----
@@ -1301,7 +1471,41 @@ function SummaryBar({ campaigns }) {
   );
 }
 
-function Tooltip({ data, position, pinned, onClose }) {
+function ConflictBanner({ conflicts }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!conflicts || conflicts.length === 0) return null;
+
+  const fmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const fmtPrice = (p) => p != null && !isNaN(p) ? `\u20AC${Number(p).toFixed(2)}` : '';
+
+  return (
+    <div className="conflict-banner">
+      <div className="conflict-banner-header" onClick={() => setExpanded(!expanded)}>
+        <span>{'\u26A0\uFE0F'}</span>
+        <span>{conflicts.length} EAN conflict{conflicts.length !== 1 ? 's' : ''} detected</span>
+        <span className={`chevron ${expanded ? 'open' : ''}`}>{'\u25BC'}</span>
+      </div>
+      {expanded && (
+        <div className="conflict-list">
+          {conflicts.map((conflict, i) => (
+            <div key={i} className="conflict-item">
+              <div className="conflict-item-title">
+                {'\u26A0'} EAN <span className="ean-code">{conflict.ean}</span> — {conflict.product}
+              </div>
+              {conflict.campaigns.map((cc, j) => (
+                <div key={j} className="conflict-item-campaign">
+                  • {cc.channel}: {cc.name} ({fmt(cc.start)} — {fmt(cc.end)}){cc.price ? ` @ ${fmtPrice(cc.price)}` : ''}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Tooltip({ data, position, pinned, onClose, conflicts }) {
   const tooltipRef = useRef(null);
   const lastSize = useRef({ w: 380, h: 300 });
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
@@ -1377,16 +1581,37 @@ function Tooltip({ data, position, pinned, onClose }) {
         </div>
       )}
       {data.notes && <div className="tooltip-row" style={{ marginTop: 6 }}><span className="tooltip-label">Notes</span><span className="tooltip-value">{data.notes}</span></div>}
+      {conflicts && conflicts.length > 0 && (() => {
+        const campaignConflicts = getConflictsForCampaign(conflicts, data.name);
+        if (campaignConflicts.length === 0) return null;
+        return (
+          <div className="tooltip-conflicts">
+            <div className="tooltip-conflicts-title">{'\u26A0'} EAN conflicts</div>
+            {campaignConflicts.map((c, i) => (
+              <div key={i} className="tooltip-conflict-item">
+                <span className="tooltip-conflict-ean">{c.ean}</span>
+                {' — '}
+                {c.campaigns.filter(cc => cc.name !== data.name).map((cc, j) => (
+                  <span key={j}>{j > 0 ? ', ' : ''}{cc.name} ({cc.channel})</span>
+                ))}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }
 
-function GanttChart({ campaigns }) {
+function GanttChart({ campaigns, conflicts }) {
   const [hoverData, setHoverData] = useState(null);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
   const [pinned, setPinned] = useState(null);
   const [pinnedPos, setPinnedPos] = useState({ x: 0, y: 0 });
   const timelineRef = useRef(null);
+
+  // Set of campaign names with EAN conflicts
+  const conflictNames = useMemo(() => conflicts ? getConflictingCampaignNames(conflicts) : new Set(), [conflicts]);
 
   // Calculate date range
   const { minDate, maxDate, totalDays } = useMemo(() => {
@@ -1549,10 +1774,11 @@ function GanttChart({ campaigns }) {
                   const leftPct = (startOffset / totalDays) * 100;
                   const widthPct = (duration / totalDays) * 100;
                   const color = getChannelColor(campaign.channel);
+                  const hasConflict = conflictNames.has(campaign.name);
                   return (
                     <div
                       key={ci}
-                      className="campaign-bar"
+                      className={`campaign-bar${hasConflict ? ' has-conflict' : ''}`}
                       style={{
                         left: `${leftPct}%`,
                         width: `${widthPct}%`,
@@ -1571,8 +1797,8 @@ function GanttChart({ campaigns }) {
           ))}
         </div>
       </div>
-      {!pinned && !isMobile && <Tooltip data={hoverData} position={hoverPos} />}
-      {pinned && <><div className="tooltip-overlay" onClick={closePin} /><Tooltip data={pinned} position={pinnedPos} pinned onClose={closePin} /></>}
+      {!pinned && !isMobile && <Tooltip data={hoverData} position={hoverPos} conflicts={conflicts} />}
+      {pinned && <><div className="tooltip-overlay" onClick={closePin} /><Tooltip data={pinned} position={pinnedPos} pinned onClose={closePin} conflicts={conflicts} /></>}
     </div>
   );
 }
@@ -1621,6 +1847,9 @@ function App() {
     });
   }, [campaigns, filters]);
 
+  // Detect EAN conflicts across ALL campaigns (not just filtered)
+  const conflicts = useMemo(() => detectConflicts(campaigns), [campaigns]);
+
   return (
     <div>
       <div className="header">
@@ -1631,7 +1860,8 @@ function App() {
         <>
           <FilterBar campaigns={campaigns} filters={filters} setFilters={setFilters} />
           <SummaryBar campaigns={filtered} />
-          <GanttChart campaigns={filtered} />
+          <ConflictBanner conflicts={conflicts} />
+          <GanttChart campaigns={filtered} conflicts={conflicts} />
         </>
       )}
       {!loading && campaigns.length === 0 && <EmptyState />}
