@@ -952,10 +952,12 @@ function parseDate(str) {
     const d = new Date(str.split('T')[0] + 'T00:00:00');
     return isNaN(d.getTime()) ? null : d;
   }
-  // EU: 01/03/2026 or 01-03-2026
-  const eu = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  // EU: 01/03/2026 or 01-03-2026 (4-digit year) or 01.03.26 (2-digit year)
+  const eu = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
   if (eu) {
-    const d = new Date(`${eu[3]}-${eu[2].padStart(2,'0')}-${eu[1].padStart(2,'0')}T00:00:00`);
+    let year = eu[3];
+    if (year.length === 2) year = (parseInt(year) > 70 ? '19' : '20') + year;
+    const d = new Date(`${year}-${eu[2].padStart(2,'0')}-${eu[1].padStart(2,'0')}T00:00:00`);
     return isNaN(d.getTime()) ? null : d;
   }
   // Last resort
