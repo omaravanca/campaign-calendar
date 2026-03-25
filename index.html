@@ -1303,36 +1303,36 @@ function SummaryBar({ campaigns }) {
 
 function Tooltip({ data, position, pinned, onClose }) {
   const tooltipRef = useRef(null);
-  const [adjustedPos, setAdjustedPos] = useState(null);
+  const lastSize = useRef({ w: 380, h: 300 });
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
 
-  useEffect(() => {
-    if (!data || isMobile || !tooltipRef.current) { setAdjustedPos(null); return; }
-    const el = tooltipRef.current;
-    const rect = el.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    let x = position.x + 12;
-    let y = position.y - 10;
-    // Flip left if overflows right
-    if (x + rect.width > vw - 12) x = position.x - rect.width - 12;
-    // Flip up if overflows bottom
-    if (y + rect.height > vh - 12) y = vh - rect.height - 12;
-    // Clamp to viewport
-    if (x < 8) x = 8;
-    if (y < 8) y = 8;
-    setAdjustedPos({ x, y });
-  }, [data, position, isMobile]);
+  // Track actual size for next render
+  React.useLayoutEffect(() => {
+    if (tooltipRef.current && !isMobile) {
+      const r = tooltipRef.current.getBoundingClientRect();
+      lastSize.current = { w: r.width, h: r.height };
+    }
+  });
 
   if (!data) return null;
   const fmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   const days = Math.ceil((data.endDate - data.startDate) / (1000 * 60 * 60 * 24)) + 1;
   const fmtPrice = (p) => p != null && !isNaN(p) ? `\u20AC${p.toFixed(2)}` : '';
 
-  const style = isMobile ? {} : {
-    left: adjustedPos ? adjustedPos.x : position.x + 12,
-    top: adjustedPos ? adjustedPos.y : position.y - 10,
-  };
+  let style = {};
+  if (!isMobile) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const tw = lastSize.current.w;
+    const th = lastSize.current.h;
+    let x = position.x + 14;
+    let y = position.y - 10;
+    if (x + tw > vw - 16) x = position.x - tw - 14;
+    if (y + th > vh - 16) y = vh - th - 16;
+    if (x < 8) x = 8;
+    if (y < 8) y = 8;
+    style = { left: x, top: y };
+  }
 
   return (
     <div ref={tooltipRef} className={`tooltip ${pinned ? 'pinned' : ''}`} style={style}>
