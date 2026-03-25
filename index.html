@@ -1521,7 +1521,6 @@ function GanttChart({ campaigns }) {
                   const leftPct = (startOffset / totalDays) * 100;
                   const widthPct = (duration / totalDays) * 100;
                   const color = getChannelColor(campaign.channel);
-                  const barOpacity = campaign.status === 'completed' ? 0.5 : campaign.status === 'planned' ? 0.75 : 1;
                   return (
                     <div
                       key={ci}
@@ -1530,7 +1529,6 @@ function GanttChart({ campaigns }) {
                         left: `${leftPct}%`,
                         width: `${widthPct}%`,
                         background: color,
-                        opacity: barOpacity,
                       }}
                       onMouseMove={(e) => handleMouseMove(e, campaign)}
                       onMouseLeave={() => { if (!pinned) setHoverData(null); }}
