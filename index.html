@@ -795,6 +795,8 @@ const CHANNEL_COLORS = {
   'bol':        '#0000C4',
   'ah':         '#00ADE6',  // Albert Heijn sky blue
   'albert heijn':'#00ADE6',
+  'ah voordeelshop':'#00ADE6',
+  'voordeelshop':'#00ADE6',
   'tinq':       '#E31937',  // Tinq red
   'meta':       '#8B5CF6',  // Meta purple
   'facebook':   '#8B5CF6',
@@ -1537,7 +1539,7 @@ function GanttChart({ campaigns }) {
                       onMouseLeave={() => { if (!pinned) setHoverData(null); }}
                       onClick={(e) => handleClick(e, campaign)}
                     >
-                      {widthPct > 8 ? campaign.name : ''}
+                      {campaign.name}
                     </div>
                   );
                 })}
