@@ -431,6 +431,11 @@
   .tooltip-ptable .pprice-strike { text-decoration: line-through; opacity: 0.6; }
   .tooltip-ptable .pprice-new { color: #fff; font-weight: 600; }
   .tooltip-ptable .pdiscount { color: #51cf66; font-weight: 700; font-size: 11px; }
+  .tooltip-ptable .pbol { white-space: nowrap; font-size: 10px; line-height: 1.5; }
+  .tooltip-ptable .pbol-ok { color: #51cf66; }
+  .tooltip-ptable .pbol-warn { color: #ff6b6b; }
+  .tooltip-ptable .pbol-na { color: #6c757d; font-style: italic; }
+  .tooltip-bol-updated { font-size: 10px; color: #6c757d; margin-top: 6px; text-align: right; }
 
   /* Legend */
   .legend {
@@ -1555,7 +1560,7 @@ function ConflictBanner({ conflicts }) {
   );
 }
 
-function Tooltip({ data, position, pinned, onClose, conflicts }) {
+function Tooltip({ data, position, pinned, onClose, conflicts, bolPrices }) {
   const tooltipRef = useRef(null);
   const lastSize = useRef({ w: 380, h: 300 });
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
@@ -1597,39 +1602,95 @@ function Tooltip({ data, position, pinned, onClose, conflicts }) {
       <div className="tooltip-row"><span className="tooltip-label">Dates</span><span className="tooltip-value">{fmt(data.startDate)} — {fmt(data.endDate)} ({days} days)</span></div>
       <div className="tooltip-row"><span className="tooltip-label">Status</span><span className="tooltip-value" style={{ textTransform: 'capitalize' }}>{data.status}</span></div>
       {data.budget != null && <div className="tooltip-row"><span className="tooltip-label">Budget</span><span className="tooltip-value">&euro;{data.budget.toLocaleString('nl-NL')}</span></div>}
-      {data.products && data.products.length > 0 && (
-        <div className="tooltip-products">
-          <div className="tooltip-products-title">Products ({data.products.length})</div>
-          <table className="tooltip-ptable">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>EANs</th>
-                <th style={{ textAlign: 'right' }}>Price</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.products.map((p, i) => (
-                <tr key={i}>
-                  <td className="pname">{p.name}</td>
-                  <td className="pean">{p.eans && p.eans.length > 0 ? p.eans.map((e, ei) => <div key={ei}>{e}</div>) : '—'}</td>
-                  <td className="pprice">
-                    {p.before && p.after ? (
-                      <>
-                        <span className="pprice-strike">{fmtPrice(p.before)}</span>{' '}
-                        <span className="pprice-new">{fmtPrice(p.after)}</span>{' '}
-                        {p.discount != null && <span className="pdiscount">-{p.discount}%</span>}
-                      </>
-                    ) : p.before ? (
-                      fmtPrice(p.before)
-                    ) : '—'}
-                  </td>
+      {data.products && data.products.length > 0 && (() => {
+        const bolMarkets = ['NL', 'BE', 'EU', 'ALL'];
+        const campaignMarkets = String(data.market).split(/[&,\/]/).map(m => m.trim().toUpperCase());
+        const isBolMarket = campaignMarkets.some(m => bolMarkets.includes(m));
+        const showBolCheck = CC_ADMIN && bolPrices && isBolMarket;
+
+        const getBolInfo = (eans) => {
+          if (!bolPrices || !eans || eans.length === 0) return null;
+          const accounts = {};
+          ['hombli', 'sinji'].forEach(acct => {
+            if (!bolPrices[acct]) return;
+            let lowest = null;
+            eans.forEach(ean => {
+              const p = bolPrices[acct][ean];
+              if (p != null && (lowest === null || p < lowest)) lowest = p;
+            });
+            if (lowest !== null) accounts[acct] = lowest;
+          });
+          return Object.keys(accounts).length > 0 ? accounts : null;
+        };
+
+        const fmtRelTime = (iso) => {
+          if (!iso) return '';
+          const diff = Date.now() - new Date(iso).getTime();
+          const mins = Math.floor(diff / 60000);
+          if (mins < 60) return `${mins}m ago`;
+          const hrs = Math.floor(mins / 60);
+          if (hrs < 24) return `${hrs}h ago`;
+          const days = Math.floor(hrs / 24);
+          return `${days}d ago`;
+        };
+
+        return (
+          <div className="tooltip-products">
+            <div className="tooltip-products-title">Products ({data.products.length})</div>
+            <table className="tooltip-ptable">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>EANs</th>
+                  <th style={{ textAlign: 'right' }}>Price</th>
+                  {showBolCheck && <th style={{ textAlign: 'right' }}>Bol.com</th>}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {data.products.map((p, i) => {
+                  const bolInfo = showBolCheck ? getBolInfo(p.eans) : null;
+                  const salePrice = p.after || p.before;
+                  return (
+                    <tr key={i}>
+                      <td className="pname">{p.name}</td>
+                      <td className="pean">{p.eans && p.eans.length > 0 ? p.eans.map((e, ei) => <div key={ei}>{e}</div>) : '—'}</td>
+                      <td className="pprice">
+                        {p.before && p.after ? (
+                          <>
+                            <span className="pprice-strike">{fmtPrice(p.before)}</span>{' '}
+                            <span className="pprice-new">{fmtPrice(p.after)}</span>{' '}
+                            {p.discount != null && <span className="pdiscount">-{p.discount}%</span>}
+                          </>
+                        ) : p.before ? (
+                          fmtPrice(p.before)
+                        ) : '—'}
+                      </td>
+                      {showBolCheck && (
+                        <td className="pbol">
+                          {bolInfo ? Object.entries(bolInfo).map(([acct, price], ai) => {
+                            const ok = salePrice ? price >= salePrice : true;
+                            const label = Object.keys(bolInfo).length > 1
+                              ? (acct.charAt(0).toUpperCase() + acct.slice(1) + ': ')
+                              : '';
+                            return (
+                              <div key={acct} className={ok ? 'pbol-ok' : 'pbol-warn'}>
+                                {label}{'\u20AC'}{price.toFixed(2)} {ok ? '\uD83D\uDFE2' : '\uD83D\uDD34'}
+                              </div>
+                            );
+                          }) : <span className="pbol-na">Not listed</span>}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {showBolCheck && bolPrices.updated && (
+              <div className="tooltip-bol-updated">Bol.com prices: {fmtRelTime(bolPrices.updated)}</div>
+            )}
+          </div>
+        );
+      })()}
       {data.notes && <div className="tooltip-row" style={{ marginTop: 6 }}><span className="tooltip-label">Notes</span><span className="tooltip-value">{data.notes}</span></div>}
       {conflicts && conflicts.length > 0 && (() => {
         const campaignConflicts = getConflictsForCampaign(conflicts, data.name);
@@ -1653,7 +1714,7 @@ function Tooltip({ data, position, pinned, onClose, conflicts }) {
   );
 }
 
-function GanttChart({ campaigns, conflicts }) {
+function GanttChart({ campaigns, conflicts, bolPrices }) {
   const [hoverData, setHoverData] = useState(null);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
   const [pinned, setPinned] = useState(null);
@@ -1847,8 +1908,8 @@ function GanttChart({ campaigns, conflicts }) {
           ))}
         </div>
       </div>
-      {!pinned && !isMobile && <Tooltip data={hoverData} position={hoverPos} conflicts={conflicts} />}
-      {pinned && <><div className="tooltip-overlay" onClick={closePin} /><Tooltip data={pinned} position={pinnedPos} pinned onClose={closePin} conflicts={conflicts} /></>}
+      {!pinned && !isMobile && <Tooltip data={hoverData} position={hoverPos} conflicts={conflicts} bolPrices={bolPrices} />}
+      {pinned && <><div className="tooltip-overlay" onClick={closePin} /><Tooltip data={pinned} position={pinnedPos} pinned onClose={closePin} conflicts={conflicts} bolPrices={bolPrices} /></>}
     </div>
   );
 }
@@ -1884,6 +1945,16 @@ function App() {
   const [campaigns, setCampaigns] = useState([]);
   const [filters, setFilters] = useState({ channels: [], markets: [], statuses: [] });
   const [loading, setLoading] = useState(false);
+  const [bolPrices, setBolPrices] = useState(null);
+
+  // Fetch Bol.com prices (admin only, silent fail)
+  useEffect(() => {
+    if (!CC_ADMIN) return;
+    fetch('bol-prices.json')
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => setBolPrices(data))
+      .catch(() => {}); // silent — file may not exist
+  }, []);
 
   const filtered = useMemo(() => {
     return campaigns.filter(c => {
@@ -1911,7 +1982,7 @@ function App() {
           <FilterBar campaigns={campaigns} filters={filters} setFilters={setFilters} />
           <SummaryBar campaigns={filtered} />
           <ConflictBanner conflicts={conflicts} />
-          <GanttChart campaigns={filtered} conflicts={conflicts} />
+          <GanttChart campaigns={filtered} conflicts={conflicts} bolPrices={bolPrices} />
         </>
       )}
       {!loading && campaigns.length === 0 && <EmptyState />}
