@@ -8,7 +8,9 @@
 <!-- Password gate -->
 <script>
   var CC_HASH = 'acee6f232d65d5dd76455ed96d94eea1c46f0ddb6f7e4f8e64d728797b5a3f3c';
-  var CC_AUTHED = sessionStorage.getItem('cc_auth') === CC_HASH;
+  var CC_ADMIN_HASH = '21297e6e966afbd06e8f08c4525ae2edcbd3696cc6bc436037e278d4b1e67b4d';
+  var CC_AUTHED = sessionStorage.getItem('cc_auth') === CC_HASH || sessionStorage.getItem('cc_auth') === CC_ADMIN_HASH;
+  var CC_ADMIN = sessionStorage.getItem('cc_auth') === CC_ADMIN_HASH;
 </script>
 
 <!-- React 18 -->
@@ -1946,10 +1948,9 @@ root.render(<App />);
     form.addEventListener('submit', async function(e) {
       e.preventDefault();
       var hash = await sha256(input.value);
-      if (hash === CC_HASH) {
-        sessionStorage.setItem('cc_auth', CC_HASH);
-        gate.style.display = 'none';
-        app.style.display = 'block';
+      if (hash === CC_HASH || hash === CC_ADMIN_HASH) {
+        sessionStorage.setItem('cc_auth', hash);
+        location.reload();
       } else {
         error.textContent = 'Incorrect password';
         input.value = '';
