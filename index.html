@@ -388,6 +388,9 @@
     max-width: 400px;
     line-height: 1.6;
   }
+  .tooltip.tooltip-wide {
+    max-width: 540px;
+  }
   .tooltip.pinned {
     pointer-events: auto;
   }
@@ -431,7 +434,8 @@
   .tooltip-ptable .pprice-strike { text-decoration: line-through; opacity: 0.6; }
   .tooltip-ptable .pprice-new { color: #fff; font-weight: 600; }
   .tooltip-ptable .pdiscount { color: #51cf66; font-weight: 700; font-size: 11px; }
-  .tooltip-ptable .pbol { white-space: nowrap; font-size: 10px; line-height: 1.5; }
+  .tooltip-products-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tooltip-ptable .pbol { white-space: nowrap; font-size: 10px; line-height: 1.5; text-align: right; }
   .tooltip-ptable .pbol-ok { color: #51cf66; }
   .tooltip-ptable .pbol-warn { color: #ff6b6b; }
   .tooltip-ptable .pbol-na { color: #6c757d; font-style: italic; }
@@ -1578,6 +1582,12 @@ function Tooltip({ data, position, pinned, onClose, conflicts, bolPrices }) {
   const days = Math.ceil((data.endDate - data.startDate) / (1000 * 60 * 60 * 24)) + 1;
   const fmtPrice = (p) => p != null && !isNaN(p) ? `\u20AC${p.toFixed(2)}` : '';
 
+  // Pre-compute whether Bol column will show (for tooltip width class)
+  const bolMarkets = ['NL', 'BE', 'EU', 'ALL'];
+  const campaignMarkets = data.market ? String(data.market).split(/[&,\/]/).map(m => m.trim().toUpperCase()) : [];
+  const isBolMarket = campaignMarkets.some(m => bolMarkets.includes(m));
+  const hasBolColumn = CC_ADMIN && bolPrices && isBolMarket && data.products && data.products.length > 0;
+
   let style = {};
   if (!isMobile) {
     const vw = window.innerWidth;
@@ -1594,7 +1604,7 @@ function Tooltip({ data, position, pinned, onClose, conflicts, bolPrices }) {
   }
 
   return (
-    <div ref={tooltipRef} className={`tooltip ${pinned ? 'pinned' : ''}`} style={style}>
+    <div ref={tooltipRef} className={`tooltip ${pinned ? 'pinned' : ''}${hasBolColumn ? ' tooltip-wide' : ''}`} style={style}>
       {pinned && <button className="tooltip-close" onClick={onClose}>&times;</button>}
       <div style={{ fontWeight: 700, marginBottom: 6, fontSize: isMobile ? 16 : 14 }}>{data.name}</div>
       <div className="tooltip-row"><span className="tooltip-label">Channel</span><span className="tooltip-value">{data.channel}</span></div>
@@ -1603,10 +1613,7 @@ function Tooltip({ data, position, pinned, onClose, conflicts, bolPrices }) {
       <div className="tooltip-row"><span className="tooltip-label">Status</span><span className="tooltip-value" style={{ textTransform: 'capitalize' }}>{data.status}</span></div>
       {data.budget != null && <div className="tooltip-row"><span className="tooltip-label">Budget</span><span className="tooltip-value">&euro;{data.budget.toLocaleString('nl-NL')}</span></div>}
       {data.products && data.products.length > 0 && (() => {
-        const bolMarkets = ['NL', 'BE', 'EU', 'ALL'];
-        const campaignMarkets = String(data.market).split(/[&,\/]/).map(m => m.trim().toUpperCase());
-        const isBolMarket = campaignMarkets.some(m => bolMarkets.includes(m));
-        const showBolCheck = CC_ADMIN && bolPrices && isBolMarket;
+        const showBolCheck = hasBolColumn;
 
         const getBolInfo = (eans) => {
           if (!bolPrices || !eans || eans.length === 0) return null;
@@ -1637,6 +1644,7 @@ function Tooltip({ data, position, pinned, onClose, conflicts, bolPrices }) {
         return (
           <div className="tooltip-products">
             <div className="tooltip-products-title">Products ({data.products.length})</div>
+            <div className={showBolCheck ? 'tooltip-products-scroll' : ''}>
             <table className="tooltip-ptable">
               <thead>
                 <tr>
@@ -1685,6 +1693,7 @@ function Tooltip({ data, position, pinned, onClose, conflicts, bolPrices }) {
                 })}
               </tbody>
             </table>
+            </div>
             {showBolCheck && bolPrices.updated && (
               <div className="tooltip-bol-updated">Bol.com prices: {fmtRelTime(bolPrices.updated)}</div>
             )}
