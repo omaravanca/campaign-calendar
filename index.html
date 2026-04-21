@@ -148,6 +148,58 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
+  .product-search {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 320px;
+  }
+  .product-search input {
+    width: 100%;
+    padding: 6px 110px 6px 30px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+    background: var(--surface);
+  }
+  .product-search input:focus { border-color: var(--accent); }
+  .product-search input.active { border-color: var(--accent); background: #eef1ff; }
+  .product-search-icon {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    color: var(--text-secondary);
+    pointer-events: none;
+  }
+  .product-search-clear {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 2px 4px;
+    line-height: 1;
+    border-radius: 3px;
+  }
+  .product-search-clear:hover { color: var(--text); background: #e9ecef; }
+  .product-search-results {
+    position: absolute;
+    right: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: var(--accent);
+    white-space: nowrap;
+    pointer-events: none;
+  }
   .filter-group {
     position: relative;
   }
@@ -733,6 +785,8 @@
       gap: 8px;
     }
     .filter-btn { min-width: 80px; font-size: 12px; padding: 5px 8px; }
+    .product-search { min-width: 0; max-width: none; width: 100%; order: -1; }
+    .product-search input { font-size: 13px; }
 
     .summary-bar {
       margin: 0 10px;
@@ -868,6 +922,7 @@
     .filter-bar { gap: 6px; }
     .filter-bar label { font-size: 11px; }
     .filter-btn { min-width: 70px; font-size: 11px; padding: 4px 6px; }
+    .product-search input { font-size: 12px; padding: 5px 10px 5px 26px; }
 
     .tooltip { padding: 14px 14px 20px; max-height: 75vh; }
     .tooltip-ptable .pean { font-size: 8px; }
@@ -1482,16 +1537,48 @@ function FilterBar({ campaigns, filters, setFilters }) {
     });
   };
 
-  const hasFilters = filters.channels.length || filters.markets.length || filters.statuses.length;
+  const hasFilters = filters.channels.length || filters.markets.length || filters.statuses.length || filters.productSearch;
+
+  // Count matching campaigns for product search
+  const productMatchCount = useMemo(() => {
+    if (!filters.productSearch) return 0;
+    const q = filters.productSearch.toLowerCase();
+    return campaigns.filter(c => {
+      if (!c.products || c.products.length === 0) return false;
+      return c.products.some(p => {
+        if (p.name && p.name.toLowerCase().includes(q)) return true;
+        if (p.eans && p.eans.some(ean => ean.toLowerCase().includes(q))) return true;
+        return false;
+      });
+    }).length;
+  }, [campaigns, filters.productSearch]);
 
   return (
     <div className="filter-bar">
       <label>Filters:</label>
+      <div className="product-search">
+        <span className="product-search-icon">{'\uD83D\uDD0D'}</span>
+        <input
+          type="text"
+          placeholder="Search EAN, SKU or product name..."
+          className={filters.productSearch ? 'active' : ''}
+          value={filters.productSearch || ''}
+          onChange={(e) => setFilters(prev => ({ ...prev, productSearch: e.target.value }))}
+        />
+        {filters.productSearch && (
+          <button className="product-search-clear" onClick={() => setFilters(prev => ({ ...prev, productSearch: '' }))}>
+            &times;
+          </button>
+        )}
+        {filters.productSearch && (
+          <span className="product-search-results">{productMatchCount} campaign{productMatchCount !== 1 ? 's' : ''}</span>
+        )}
+      </div>
       <FilterDropdown label="Channel" options={channels} selected={filters.channels} onToggle={(v) => toggle('channels', v)} />
       <FilterDropdown label="Market" options={markets} selected={filters.markets} onToggle={(v) => toggle('markets', v)} />
       <FilterDropdown label="Status" options={statuses} selected={filters.statuses} onToggle={(v) => toggle('statuses', v)} />
       {hasFilters && (
-        <button className="btn btn-icon" onClick={() => setFilters({ channels: [], markets: [], statuses: [] })}>
+        <button className="btn btn-icon" onClick={() => setFilters({ channels: [], markets: [], statuses: [], productSearch: '' })}>
           Clear filters
         </button>
       )}
@@ -1952,7 +2039,7 @@ function EmptyState() {
 
 function App() {
   const [campaigns, setCampaigns] = useState([]);
-  const [filters, setFilters] = useState({ channels: [], markets: [], statuses: [] });
+  const [filters, setFilters] = useState({ channels: [], markets: [], statuses: [], productSearch: '' });
   const [loading, setLoading] = useState(false);
   const [bolPrices, setBolPrices] = useState(null);
 
@@ -1973,6 +2060,16 @@ function App() {
         if (!filters.markets.some(fm => campaignMarkets.includes(fm))) return false;
       }
       if (filters.statuses.length && !filters.statuses.includes(c.status)) return false;
+      if (filters.productSearch) {
+        const q = filters.productSearch.toLowerCase();
+        if (!c.products || c.products.length === 0) return false;
+        const match = c.products.some(p => {
+          if (p.name && p.name.toLowerCase().includes(q)) return true;
+          if (p.eans && p.eans.some(ean => ean.toLowerCase().includes(q))) return true;
+          return false;
+        });
+        if (!match) return false;
+      }
       return true;
     });
   }, [campaigns, filters]);
